@@ -38,8 +38,8 @@ A comprehensive tool that analyzes GitHub repositories and generates detailed re
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
-cd code_reporter_claude
+git clone https://github.com/UoGSoE/repo-reporter.git
+cd repo-reporter
 
 # Install dependencies (requires Python 3.13+)
 uv sync
@@ -251,3 +251,4 @@ Set up automated monthly reporting with GitHub Actions! The workflow runs on the
 ## Support
 
 For issues and feature requests, please use the GitHub issue tracker.
+
