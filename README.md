@@ -81,7 +81,7 @@ https://github.com/laravel/laravel
 uv run python -m code_reporter.cli --repo-list-file repos.txt
 
 # With all options
-uv run python -m code_reporter.cli \
+uv run main.py \
     --repo-list-file repos.txt \
     --output-dir ./reports \
     --format both \
@@ -99,7 +99,7 @@ Reports are generated in the `./reports` directory:
 ## Command Line Options
 
 ```bash
-uv run python -m code_reporter.cli --help
+uv run main.py --help
 ```
 
 | Option | Description | Default |
@@ -194,7 +194,7 @@ The tool uses a **3-strategy matching system** to connect your GitHub repositori
 Run with `--verbose` for detailed logging:
 
 ```bash
-uv run python -m code_reporter.cli --repo-list-file repos.txt --verbose
+uv run main.py --repo-list-file repos.txt --verbose
 ```
 
 ## Development
