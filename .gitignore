@@ -4,3 +4,7 @@ reports/*.md
 reports*
 *.png
 *.md
+!README.md
+!GITHUB_ACTION_SETUP.md
+!PROMPT_CUSTOMIZATION.md
+
