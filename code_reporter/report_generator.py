@@ -101,6 +101,15 @@ class ReportGenerator:
         
         report_paths['executive_summary'] = str(summary_path)
         
+        # Generate combined report (all projects in one document)
+        combined_html = self._generate_combined_report(processed_data)
+        combined_path = self.output_dir / "combined_report.html"
+        
+        with open(combined_path, 'w', encoding='utf-8') as f:
+            f.write(combined_html)
+        
+        report_paths['combined_report'] = str(combined_path)
+        
         return report_paths
     
     def _process_analysis_data(self, analysis_results: Dict) -> Dict:
@@ -346,6 +355,36 @@ class ReportGenerator:
             'summary': summary,
             'charts': charts,
             'projects': list(processed_data['projects'].values()),
+            'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'llm_summary': processed_data.get('llm_summary'),
+            'risk_metrics': {
+                'vulnerable_projects': vulnerable_projects,
+                'risk_score': round(risk_score, 1),
+                'total_vulnerabilities': summary['total_vulnerabilities']
+            }
+        }
+        
+        return template.render(**template_data)
+    
+    def _generate_combined_report(self, processed_data: Dict) -> str:
+        """Generate combined report HTML with all projects in one document."""
+        template = self.jinja_env.get_template('combined_report.html')
+        
+        # Prepare summary data (same as executive summary)
+        summary = processed_data['summary']
+        charts = processed_data['charts']
+        
+        # Calculate risk metrics
+        total_projects = summary['successful_analyses']
+        vulnerable_projects = sum(1 for p in processed_data['projects'].values() 
+                                if p.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0)
+        
+        risk_score = (vulnerable_projects / max(total_projects, 1)) * 100
+        
+        template_data = {
+            'summary': summary,
+            'charts': charts,
+            'projects': processed_data['projects'],  # Keep as dict for template iteration
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'llm_summary': processed_data.get('llm_summary'),
             'risk_metrics': {

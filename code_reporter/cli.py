@@ -247,6 +247,8 @@ def main(
         for report_type, path in report_paths.items():
             if report_type == 'executive_summary':
                 click.echo(f"  📊 Executive Summary: {path}")
+            elif report_type == 'combined_report':
+                click.echo(f"  📑 Combined Report (All Projects): {path}")
             else:
                 click.echo(f"  📋 {report_type.replace('https://github.com/', '')}: {path}")
         
