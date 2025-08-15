@@ -10,6 +10,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 from jinja2 import Environment, FileSystemLoader, Template
 import pandas as pd
+from .llm_analyzer import LLMAnalyzer
 
 
 class ReportGenerator:
@@ -18,6 +19,13 @@ class ReportGenerator:
     def __init__(self, output_dir: Path):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize LLM analyzer
+        try:
+            self.llm_analyzer = LLMAnalyzer()
+        except ValueError as e:
+            print(f"Warning: LLM analyzer unavailable: {e}")
+            self.llm_analyzer = None
         
         # Set up Jinja2 environment
         self.template_dir = Path(__file__).parent / "templates"
@@ -130,6 +138,19 @@ class ReportGenerator:
         
         # Generate chart data
         processed['charts'] = self._generate_charts(processed)
+        
+        # Generate LLM-powered executive summary
+        if self.llm_analyzer:
+            try:
+                print("🤖 Calling LLM for executive summary...")
+                processed['llm_summary'] = self.llm_analyzer.generate_executive_summary(processed)
+                print(f"✅ LLM summary generated: {len(processed.get('llm_summary', ''))} characters")
+            except Exception as e:
+                print(f"❌ LLM summary generation failed: {e}")
+                processed['llm_summary'] = None
+        else:
+            print("⚠️ LLM analyzer not available")
+            processed['llm_summary'] = None
         
         return processed
     
@@ -254,6 +275,7 @@ class ReportGenerator:
             'charts': charts,
             'projects': list(processed_data['projects'].values()),
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'llm_summary': processed_data.get('llm_summary'),
             'risk_metrics': {
                 'vulnerable_projects': vulnerable_projects,
                 'risk_score': round(risk_score, 1),
@@ -458,6 +480,8 @@ class ReportGenerator:
         .footer { margin-top: 50px; padding-top: 30px; border-top: 1px solid #eee; color: #666; text-align: center; }
         .recommendations { background: #fff8f0; border: 1px solid #fd7e14; border-radius: 8px; padding: 25px; margin: 30px 0; }
         .recommendations h3 { color: #fd7e14; margin-top: 0; }
+        .llm-summary { line-height: 1.6; }
+        .llm-summary p { margin: 0 0 15px 0; text-align: justify; }
     </style>
 </head>
 <body>
@@ -492,18 +516,26 @@ class ReportGenerator:
 
         <!-- Executive Summary Text -->
         <div class="executive-summary">
-            <h2>📋 Summary</h2>
-            <p>This report analyzes <strong>{{ summary.successful_analyses }} software projects</strong> across multiple programming languages and frameworks. The analysis covers code quality, security vulnerabilities, dependency management, and development activity metrics.</p>
-            
-            {% if risk_metrics.vulnerable_projects > 0 %}
-                <p><strong>⚠️ Security Alert:</strong> {{ risk_metrics.vulnerable_projects }} out of {{ summary.successful_analyses }} projects have known security vulnerabilities, representing a {{ risk_metrics.risk_score }}% risk exposure. Immediate attention is recommended for vulnerable projects.</p>
+            <h2>📋 Executive Analysis</h2>
+            {% if llm_summary %}
+                <!-- LLM-Generated Strategic Summary -->
+                <div class="llm-summary">
+                    <p>{{ llm_summary | replace('\n\n', '</p><p>') | safe }}</p>
+                </div>
             {% else %}
-                <p><strong>✅ Security Status:</strong> All analyzed projects show clean security profiles with no known vulnerabilities detected.</p>
-            {% endif %}
+                <!-- Fallback Summary -->
+                <p>This report analyzes <strong>{{ summary.successful_analyses }} software projects</strong> across multiple programming languages and frameworks. The analysis covers code quality, security vulnerabilities, dependency management, and development activity metrics.</p>
+                
+                {% if risk_metrics.vulnerable_projects > 0 %}
+                    <p><strong>⚠️ Security Alert:</strong> {{ risk_metrics.vulnerable_projects }} out of {{ summary.successful_analyses }} projects have known security vulnerabilities, representing a {{ risk_metrics.risk_score }}% risk exposure. Immediate attention is recommended for vulnerable projects.</p>
+                {% else %}
+                    <p><strong>✅ Security Status:</strong> All analyzed projects show clean security profiles with no known vulnerabilities detected.</p>
+                {% endif %}
 
-            <p><strong>Technology Stack:</strong> The portfolio spans {{ summary.languages|length }} primary programming languages with {{ summary.frameworks|length }} different frameworks in use.</p>
-            
-            <p><strong>Development Activity:</strong> Across all projects, there have been {{ summary.activity_metrics.total_commits }} commits in the past month by {{ summary.activity_metrics.total_contributors }} unique contributors, indicating {{ "active" if summary.activity_metrics.total_commits > 10 else "moderate" }} development activity.</p>
+                <p><strong>Technology Stack:</strong> The portfolio spans {{ summary.languages|length }} primary programming languages with {{ summary.frameworks|length }} different frameworks in use.</p>
+                
+                <p><strong>Development Activity:</strong> Across all projects, there have been {{ summary.activity_metrics.total_commits }} commits in the past month by {{ summary.activity_metrics.total_contributors }} unique contributors, indicating {{ "active" if summary.activity_metrics.total_commits > 10 else "moderate" }} development activity.</p>
+            {% endif %}
         </div>
 
         <!-- Charts Section -->

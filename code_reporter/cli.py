@@ -200,6 +200,8 @@ def main(
     # Generate reports if we have successful analyses
     if successful > 0:
         click.echo(f"\n📄 Generating reports...")
+        if verbose:
+            click.echo("  🤖 Generating LLM-powered executive summary...")
         
         report_generator = ReportGenerator(output_dir)
         report_paths = report_generator.generate_reports(analysis_results, format)

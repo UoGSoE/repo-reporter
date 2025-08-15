@@ -32,6 +32,8 @@
         .footer { margin-top: 50px; padding-top: 30px; border-top: 1px solid #eee; color: #666; text-align: center; }
         .recommendations { background: #fff8f0; border: 1px solid #fd7e14; border-radius: 8px; padding: 25px; margin: 30px 0; }
         .recommendations h3 { color: #fd7e14; margin-top: 0; }
+        .llm-summary { line-height: 1.6; }
+        .llm-summary p { margin: 0 0 15px 0; text-align: justify; }
     </style>
 </head>
 <body>
@@ -66,18 +68,26 @@
 
         <!-- Executive Summary Text -->
         <div class="executive-summary">
-            <h2>📋 Summary</h2>
-            <p>This report analyzes <strong>{{ summary.successful_analyses }} software projects</strong> across multiple programming languages and frameworks. The analysis covers code quality, security vulnerabilities, dependency management, and development activity metrics.</p>
-            
-            {% if risk_metrics.vulnerable_projects > 0 %}
-                <p><strong>⚠️ Security Alert:</strong> {{ risk_metrics.vulnerable_projects }} out of {{ summary.successful_analyses }} projects have known security vulnerabilities, representing a {{ risk_metrics.risk_score }}% risk exposure. Immediate attention is recommended for vulnerable projects.</p>
+            <h2>📋 Executive Analysis</h2>
+            {% if llm_summary %}
+                <!-- LLM-Generated Strategic Summary -->
+                <div class="llm-summary">
+                    <p>{{ llm_summary | replace('\n\n', '</p><p>') | safe }}</p>
+                </div>
             {% else %}
-                <p><strong>✅ Security Status:</strong> All analyzed projects show clean security profiles with no known vulnerabilities detected.</p>
-            {% endif %}
+                <!-- Fallback Summary -->
+                <p>This report analyzes <strong>{{ summary.successful_analyses }} software projects</strong> across multiple programming languages and frameworks. The analysis covers code quality, security vulnerabilities, dependency management, and development activity metrics.</p>
+                
+                {% if risk_metrics.vulnerable_projects > 0 %}
+                    <p><strong>⚠️ Security Alert:</strong> {{ risk_metrics.vulnerable_projects }} out of {{ summary.successful_analyses }} projects have known security vulnerabilities, representing a {{ risk_metrics.risk_score }}% risk exposure. Immediate attention is recommended for vulnerable projects.</p>
+                {% else %}
+                    <p><strong>✅ Security Status:</strong> All analyzed projects show clean security profiles with no known vulnerabilities detected.</p>
+                {% endif %}
 
-            <p><strong>Technology Stack:</strong> The portfolio spans {{ summary.languages|length }} primary programming languages with {{ summary.frameworks|length }} different frameworks in use.</p>
-            
-            <p><strong>Development Activity:</strong> Across all projects, there have been {{ summary.activity_metrics.total_commits }} commits in the past month by {{ summary.activity_metrics.total_contributors }} unique contributors, indicating {{ "active" if summary.activity_metrics.total_commits > 10 else "moderate" }} development activity.</p>
+                <p><strong>Technology Stack:</strong> The portfolio spans {{ summary.languages|length }} primary programming languages with {{ summary.frameworks|length }} different frameworks in use.</p>
+                
+                <p><strong>Development Activity:</strong> Across all projects, there have been {{ summary.activity_metrics.total_commits }} commits in the past month by {{ summary.activity_metrics.total_contributors }} unique contributors, indicating {{ "active" if summary.activity_metrics.total_commits > 10 else "moderate" }} development activity.</p>
+            {% endif %}
         </div>
 
         <!-- Charts Section -->
