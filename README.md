@@ -1,4 +1,5 @@
 # Code Reporter
+ython 
 
 A comprehensive tool that analyzes GitHub repositories and generates detailed reports covering code quality, security vulnerabilities, dependencies, development activity, and production error tracking via Sentry integration.
 
@@ -78,7 +79,7 @@ https://github.com/laravel/laravel
 
 ```bash
 # Basic usage
-uv run python -m code_reporter.cli --repo-list-file repos.txt
+uv run main.py --repo-list-file repos.txt
 
 # With all options
 uv run main.py \
