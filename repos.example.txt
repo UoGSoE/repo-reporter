@@ -1,0 +1,14 @@
+# Sample repository list - one URL per line
+# Lines starting with # are ignored
+
+# Popular PHP/Laravel projects
+https://github.com/laravel/laravel
+https://github.com/laravel/framework
+
+# Popular Python projects  
+https://github.com/pallets/flask
+https://github.com/django/django
+
+# Popular Golang projects
+https://github.com/gin-gonic/gin
+https://github.com/gorilla/mux

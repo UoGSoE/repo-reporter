@@ -1,0 +1,482 @@
+"""Dependency analysis and CVE detection functionality."""
+
+import json
+import re
+import subprocess
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
+import requests
+import tomli
+import yaml
+
+
+class DependencyAnalyzer:
+    """Analyzes project dependencies and checks for security vulnerabilities."""
+    
+    def __init__(self):
+        self.osv_api_base = "https://api.osv.dev/v1"
+        self.session = requests.Session()
+        # Cache for CVE lookups to avoid repeated API calls
+        self._cve_cache = {}
+    
+    def analyze_repository(self, repo_path: Path, language_info: Dict) -> Dict:
+        """
+        Analyze repository dependencies and check for vulnerabilities.
+        
+        Args:
+            repo_path: Path to the cloned repository
+            language_info: Language detection results
+            
+        Returns:
+            Dictionary containing dependency analysis results
+        """
+        result = {
+            'dependencies': {},
+            'vulnerabilities': [],
+            'outdated_packages': [],
+            'licenses': {},
+            'summary': {
+                'total_dependencies': 0,
+                'vulnerable_packages': 0,
+                'outdated_packages': 0
+            }
+        }
+        
+        # Analyze dependencies for each detected language
+        for lang_name, lang_info in language_info.get('languages', {}).items():
+            if not lang_info.get('detected'):
+                continue
+                
+            if lang_name == 'php':
+                php_deps = self._analyze_php_dependencies(repo_path)
+                result['dependencies']['php'] = php_deps
+            
+            elif lang_name == 'python':
+                python_deps = self._analyze_python_dependencies(repo_path)
+                result['dependencies']['python'] = python_deps
+            
+            elif lang_name == 'golang':
+                go_deps = self._analyze_golang_dependencies(repo_path)
+                result['dependencies']['golang'] = go_deps
+        
+        # Check for vulnerabilities
+        all_packages = self._flatten_dependencies(result['dependencies'])
+        result['vulnerabilities'] = self._check_vulnerabilities(all_packages)
+        
+        # Update summary
+        result['summary']['total_dependencies'] = len(all_packages)
+        result['summary']['vulnerable_packages'] = len(result['vulnerabilities'])
+        
+        return result
+    
+    def _analyze_php_dependencies(self, repo_path: Path) -> Dict:
+        """Analyze PHP dependencies from composer.json and composer.lock."""
+        result = {
+            'detected': False,
+            'packages': {},
+            'dev_packages': {},
+            'package_files': []
+        }
+        
+        # Check composer.json
+        composer_json = repo_path / 'composer.json'
+        if composer_json.exists():
+            result['detected'] = True
+            result['package_files'].append('composer.json')
+            
+            try:
+                with open(composer_json, 'r') as f:
+                    composer_data = json.load(f)
+                
+                # Extract dependencies
+                require = composer_data.get('require', {})
+                require_dev = composer_data.get('require-dev', {})
+                
+                result['packages'] = self._parse_php_packages(require)
+                result['dev_packages'] = self._parse_php_packages(require_dev)
+                
+            except Exception as e:
+                result['error'] = f"Failed to parse composer.json: {str(e)}"
+        
+        # Check composer.lock for exact versions
+        composer_lock = repo_path / 'composer.lock'
+        if composer_lock.exists():
+            result['package_files'].append('composer.lock')
+            try:
+                with open(composer_lock, 'r') as f:
+                    lock_data = json.load(f)
+                
+                # Override with exact versions from lock file
+                packages = lock_data.get('packages', [])
+                for package in packages:
+                    name = package.get('name')
+                    version = package.get('version', '').lstrip('v')
+                    if name and version:
+                        result['packages'][name] = {
+                            'version': version,
+                            'constraint': result['packages'].get(name, {}).get('constraint', ''),
+                            'source': 'composer.lock'
+                        }
+                        
+            except Exception:
+                pass  # composer.lock parsing is optional
+        
+        return result
+    
+    def _parse_php_packages(self, packages: Dict) -> Dict:
+        """Parse PHP package requirements."""
+        result = {}
+        for name, constraint in packages.items():
+            # Skip PHP itself and extensions
+            if name.startswith('php') or name.startswith('ext-'):
+                continue
+            
+            version = self._extract_version_from_constraint(constraint)
+            result[name] = {
+                'version': version,
+                'constraint': constraint,
+                'source': 'composer.json'
+            }
+        
+        return result
+    
+    def _analyze_python_dependencies(self, repo_path: Path) -> Dict:
+        """Analyze Python dependencies from various files."""
+        result = {
+            'detected': False,
+            'packages': {},
+            'dev_packages': {},
+            'package_files': []
+        }
+        
+        # Check requirements.txt
+        req_file = repo_path / 'requirements.txt'
+        if req_file.exists():
+            result['detected'] = True
+            result['package_files'].append('requirements.txt')
+            result['packages'].update(self._parse_requirements_txt(req_file))
+        
+        # Check pyproject.toml
+        pyproject = repo_path / 'pyproject.toml'
+        if pyproject.exists():
+            result['detected'] = True
+            result['package_files'].append('pyproject.toml')
+            packages = self._parse_pyproject_toml(pyproject)
+            result['packages'].update(packages.get('main', {}))
+            result['dev_packages'].update(packages.get('dev', {}))
+        
+        # Check Pipfile
+        pipfile = repo_path / 'Pipfile'
+        if pipfile.exists():
+            result['detected'] = True
+            result['package_files'].append('Pipfile')
+            packages = self._parse_pipfile(pipfile)
+            result['packages'].update(packages.get('main', {}))
+            result['dev_packages'].update(packages.get('dev', {}))
+        
+        return result
+    
+    def _parse_requirements_txt(self, req_file: Path) -> Dict:
+        """Parse requirements.txt file."""
+        packages = {}
+        try:
+            content = req_file.read_text()
+            for line in content.splitlines():
+                line = line.strip()
+                if line and not line.startswith('#') and not line.startswith('-'):
+                    # Parse package==version or package>=version etc.
+                    match = re.match(r'^([a-zA-Z0-9_.-]+)(.*)', line)
+                    if match:
+                        name = match.group(1)
+                        constraint = match.group(2) or ''
+                        version = self._extract_version_from_constraint(constraint)
+                        packages[name] = {
+                            'version': version,
+                            'constraint': constraint,
+                            'source': 'requirements.txt'
+                        }
+        except Exception:
+            pass
+        
+        return packages
+    
+    def _parse_pyproject_toml(self, pyproject: Path) -> Dict:
+        """Parse pyproject.toml dependencies."""
+        packages = {'main': {}, 'dev': {}}
+        try:
+            with open(pyproject, 'rb') as f:
+                data = tomli.load(f)
+            
+            # Check project dependencies
+            project_deps = data.get('project', {}).get('dependencies', [])
+            for dep in project_deps:
+                name, constraint = self._parse_python_dependency(dep)
+                if name:
+                    packages['main'][name] = {
+                        'version': self._extract_version_from_constraint(constraint),
+                        'constraint': constraint,
+                        'source': 'pyproject.toml'
+                    }
+            
+            # Check optional dependencies (dev)
+            optional_deps = data.get('project', {}).get('optional-dependencies', {})
+            for group_name, deps in optional_deps.items():
+                for dep in deps:
+                    name, constraint = self._parse_python_dependency(dep)
+                    if name:
+                        packages['dev'][name] = {
+                            'version': self._extract_version_from_constraint(constraint),
+                            'constraint': constraint,
+                            'source': f'pyproject.toml[{group_name}]'
+                        }
+            
+            # Check poetry dependencies if present
+            poetry_deps = data.get('tool', {}).get('poetry', {}).get('dependencies', {})
+            for name, constraint in poetry_deps.items():
+                if name != 'python':
+                    if isinstance(constraint, dict):
+                        constraint_str = constraint.get('version', '')
+                    else:
+                        constraint_str = str(constraint)
+                    
+                    packages['main'][name] = {
+                        'version': self._extract_version_from_constraint(constraint_str),
+                        'constraint': constraint_str,
+                        'source': 'pyproject.toml[poetry]'
+                    }
+            
+        except Exception:
+            pass
+        
+        return packages
+    
+    def _parse_pipfile(self, pipfile: Path) -> Dict:
+        """Parse Pipfile dependencies."""
+        packages = {'main': {}, 'dev': {}}
+        try:
+            content = pipfile.read_text()
+            data = tomli.loads(content)
+            
+            # Main packages
+            main_packages = data.get('packages', {})
+            for name, constraint in main_packages.items():
+                if isinstance(constraint, dict):
+                    constraint_str = constraint.get('version', '')
+                else:
+                    constraint_str = str(constraint)
+                
+                packages['main'][name] = {
+                    'version': self._extract_version_from_constraint(constraint_str),
+                    'constraint': constraint_str,
+                    'source': 'Pipfile'
+                }
+            
+            # Dev packages
+            dev_packages = data.get('dev-packages', {})
+            for name, constraint in dev_packages.items():
+                if isinstance(constraint, dict):
+                    constraint_str = constraint.get('version', '')
+                else:
+                    constraint_str = str(constraint)
+                
+                packages['dev'][name] = {
+                    'version': self._extract_version_from_constraint(constraint_str),
+                    'constraint': constraint_str,
+                    'source': 'Pipfile[dev]'
+                }
+                
+        except Exception:
+            pass
+        
+        return packages
+    
+    def _analyze_golang_dependencies(self, repo_path: Path) -> Dict:
+        """Analyze Golang dependencies from go.mod."""
+        result = {
+            'detected': False,
+            'packages': {},
+            'dev_packages': {},
+            'package_files': []
+        }
+        
+        go_mod = repo_path / 'go.mod'
+        if go_mod.exists():
+            result['detected'] = True
+            result['package_files'].append('go.mod')
+            
+            try:
+                content = go_mod.read_text()
+                
+                # Parse require block
+                require_match = re.search(r'require\s*\((.*?)\)', content, re.DOTALL)
+                if require_match:
+                    require_block = require_match.group(1)
+                    for line in require_block.split('\n'):
+                        line = line.strip()
+                        if line and not line.startswith('//'):
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                name = parts[0]
+                                version = parts[1].lstrip('v')
+                                result['packages'][name] = {
+                                    'version': version,
+                                    'constraint': parts[1],
+                                    'source': 'go.mod'
+                                }
+                
+                # Also parse single line requires
+                for line in content.split('\n'):
+                    line = line.strip()
+                    if line.startswith('require ') and '(' not in line:
+                        parts = line.replace('require ', '').split()
+                        if len(parts) >= 2:
+                            name = parts[0]
+                            version = parts[1].lstrip('v')
+                            result['packages'][name] = {
+                                'version': version,
+                                'constraint': parts[1],
+                                'source': 'go.mod'
+                            }
+                            
+            except Exception as e:
+                result['error'] = f"Failed to parse go.mod: {str(e)}"
+        
+        return result
+    
+    def _parse_python_dependency(self, dep_string: str) -> Tuple[str, str]:
+        """Parse a Python dependency string into name and constraint."""
+        # Handle various formats: "package", "package==1.0", "package>=1.0", etc.
+        match = re.match(r'^([a-zA-Z0-9_.-]+)(.*)', dep_string.strip())
+        if match:
+            return match.group(1), match.group(2) or ''
+        return '', ''
+    
+    def _extract_version_from_constraint(self, constraint: str) -> str:
+        """Extract a specific version number from a constraint string."""
+        if not constraint:
+            return 'unknown'
+        
+        # Remove constraint operators and extract version
+        cleaned = re.sub(r'^[\^\~\>\<\=\!\s\*]+', '', constraint)
+        version_match = re.search(r'(\d+(?:\.\d+)*(?:\.\d+)*)', cleaned)
+        return version_match.group(1) if version_match else 'unknown'
+    
+    def _flatten_dependencies(self, dependencies: Dict) -> List[Dict]:
+        """Flatten nested dependency structure into a list of packages."""
+        packages = []
+        
+        for lang, lang_deps in dependencies.items():
+            if not lang_deps.get('detected'):
+                continue
+                
+            # Add main packages
+            for name, info in lang_deps.get('packages', {}).items():
+                packages.append({
+                    'name': name,
+                    'version': info['version'],
+                    'language': lang,
+                    'source': info['source'],
+                    'dev': False
+                })
+            
+            # Add dev packages
+            for name, info in lang_deps.get('dev_packages', {}).items():
+                packages.append({
+                    'name': name,
+                    'version': info['version'],
+                    'language': lang,
+                    'source': info['source'],
+                    'dev': True
+                })
+        
+        return packages
+    
+    def _check_vulnerabilities(self, packages: List[Dict]) -> List[Dict]:
+        """Check packages for known vulnerabilities using OSV API."""
+        vulnerabilities = []
+        
+        for package in packages:
+            if package['version'] == 'unknown':
+                continue
+            
+            # Create cache key
+            cache_key = f"{package['language']}:{package['name']}:{package['version']}"
+            
+            if cache_key in self._cve_cache:
+                vulns = self._cve_cache[cache_key]
+            else:
+                vulns = self._query_osv_api(package)
+                self._cve_cache[cache_key] = vulns
+            
+            if vulns:
+                vulnerabilities.extend([
+                    {
+                        'package': package['name'],
+                        'version': package['version'],
+                        'language': package['language'],
+                        'vulnerability': vuln,
+                        'dev_dependency': package['dev']
+                    }
+                    for vuln in vulns
+                ])
+        
+        return vulnerabilities
+    
+    def _query_osv_api(self, package: Dict) -> List[Dict]:
+        """Query OSV API for vulnerabilities."""
+        try:
+            # Map language to ecosystem
+            ecosystem_map = {
+                'python': 'PyPI',
+                'php': 'Packagist',
+                'golang': 'Go'
+            }
+            
+            ecosystem = ecosystem_map.get(package['language'])
+            if not ecosystem:
+                return []
+            
+            # Query OSV API
+            url = f"{self.osv_api_base}/query"
+            payload = {
+                "package": {
+                    "name": package['name'],
+                    "ecosystem": ecosystem
+                },
+                "version": package['version']
+            }
+            
+            response = self.session.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                vulns = data.get('vulns', [])
+                
+                return [
+                    {
+                        'id': vuln.get('id'),
+                        'summary': vuln.get('summary', 'No summary available'),
+                        'severity': self._extract_severity(vuln),
+                        'published': vuln.get('published'),
+                        'modified': vuln.get('modified')
+                    }
+                    for vuln in vulns
+                ]
+            
+        except Exception:
+            # Don't fail the entire analysis if CVE lookup fails
+            pass
+        
+        return []
+    
+    def _extract_severity(self, vuln: Dict) -> Optional[str]:
+        """Extract severity from vulnerability data."""
+        severity = vuln.get('database_specific', {}).get('severity')
+        if severity:
+            return severity
+        
+        # Check for CVSS scores
+        for score in vuln.get('severity', []):
+            if score.get('type') == 'CVSS_V3':
+                return score.get('score', 'Unknown')
+        
+        return 'Unknown'

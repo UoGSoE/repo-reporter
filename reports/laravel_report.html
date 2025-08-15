@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>laravel - Code Analysis Report</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { border-bottom: 3px solid #007acc; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h1 { color: #007acc; margin: 0; font-size: 2.5em; }
+        .header .meta { color: #666; margin-top: 10px; }
+        .section { margin: 30px 0; }
+        .section h2 { color: #333; border-left: 4px solid #007acc; padding-left: 15px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 4px solid #007acc; }
+        .vulnerability { background: #fff5f5; border-left-color: #dc3545; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .vulnerability.high { background: #fff0f0; border-left-color: #dc3545; }
+        .vulnerability.medium { background: #fff8f0; border-left-color: #fd7e14; }
+        .vulnerability.low { background: #f0f8f0; border-left-color: #28a745; }
+        .secure { color: #28a745; font-weight: bold; }
+        .warning { color: #dc3545; font-weight: bold; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
+        .badge.success { background: #d4edda; color: #155724; }
+        .badge.danger { background: #f8d7da; color: #721c24; }
+        .badge.warning { background: #fff3cd; color: #856404; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .stat-item { text-align: center; padding: 20px; background: #f8f9fa; border-radius: 6px; }
+        .stat-number { font-size: 2em; font-weight: bold; color: #007acc; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>laravel</h1>
+            <div class="meta">
+                <strong>Owner:</strong> laravel | 
+                <strong>URL:</strong> <a href="https://github.com/laravel/laravel" target="_blank">https://github.com/laravel/laravel</a> |
+                <strong>Generated:</strong> 2025-08-15 18:08:32
+            </div>
+        </div>
+
+        <!-- Overview Section -->
+        <div class="section">
+            <h2>📊 Project Overview</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">81821</div>
+                    <div>Stars</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">24452</div>
+                    <div>Forks</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">8</div>
+                    <div>Dependencies</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number secure">0</div>
+                    <div>Vulnerabilities</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technology Stack -->
+        <div class="section">
+            <h2>🔧 Technology Stack</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Primary Language</h3>
+                    <p><strong>Php</strong></p>
+                    
+                        
+                        
+                            <p>Version: 8.2</p>
+                        
+                        
+                            <p><strong>Frameworks:</strong></p>
+                            <ul>
+                            
+                                <li>Laravel 
+                                    (v12.0)
+                                </li>
+                            
+                            </ul>
+                        
+                    
+                </div>
+                <div class="card">
+                    <h3>Repository Info</h3>
+                    
+                    
+                        <p><strong>Description:</strong> Laravel is a web application framework with expressive, elegant syntax. We’ve already laid the foundation for your next big idea — freeing you to create without sweating the small things.</p>
+                    
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Analysis -->
+        <div class="section">
+            <h2>🛡️ Security Analysis</h2>
+            
+                <p class="secure">✅ No known security vulnerabilities found</p>
+            
+        </div>
+
+        <!-- Activity Metrics -->
+        <div class="section">
+            <h2>📈 Recent Activity (Past 30 Days)</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Development Activity</h3>
+                    <p><strong>Commits:</strong> 8</p>
+                    <p><strong>Contributors:</strong> 5</p>
+                    
+                        <p><strong>Top Contributor:</strong> Ahmed Alaa (3 commits)</p>
+                    
+                </div>
+                <div class="card">
+                    <h3>Issue Management</h3>
+                    <p><strong>Issues Created:</strong> 0</p>
+                    <p><strong>Issues Resolved:</strong> 0</p>
+                    <p><strong>Resolution Rate:</strong> 0%</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Generated by Code Reporter on 2025-08-15 18:08:32</p>
+        </div>
+    </div>
+</body>
+</html>
