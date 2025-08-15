@@ -1,16 +1,28 @@
 """LLM-powered analysis and summary generation."""
 
 import os
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 import litellm
 import json
+from jinja2 import Environment, FileSystemLoader
 
 
 class LLMAnalyzer:
     """Uses LLMs to generate executive summaries and insights."""
     
-    def __init__(self):
-        self.model = self._select_model()
+    def __init__(self, model: str = None):
+        if model:
+            self.model = model
+        else:
+            self.model = self._select_model()
+        
+        # Set up Jinja2 environment for prompt templates
+        self.template_dir = Path(__file__).parent / "templates"
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(str(self.template_dir)),
+            autoescape=False  # We want raw text output for prompts
+        )
         
         # Configure litellm
         litellm.set_verbose = False
@@ -37,7 +49,16 @@ class LLMAnalyzer:
         # Prepare context for the LLM
         context = self._prepare_llm_context(processed_data)
         
-        prompt = f"""You are a technical consultant writing an executive summary for senior management about their software portfolio. 
+        # Load and render the prompt template
+        try:
+            template = self.jinja_env.get_template('llm_prompt.txt')
+            prompt = template.render(
+                context=context,
+                context_json=json.dumps(context, indent=2)
+            )
+        except Exception as e:
+            # Fallback to hardcoded prompt if template fails
+            prompt = f"""You are a technical consultant writing an executive summary for senior management about their software portfolio. 
 
 Based on the following analysis of {context['total_projects']} software projects, write a professional executive summary that:
 

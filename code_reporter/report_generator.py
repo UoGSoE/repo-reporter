@@ -16,13 +16,13 @@ from .llm_analyzer import LLMAnalyzer
 class ReportGenerator:
     """Generates HTML reports from analysis results."""
     
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, llm_model: str = "openai/o4-mini"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize LLM analyzer
         try:
-            self.llm_analyzer = LLMAnalyzer()
+            self.llm_analyzer = LLMAnalyzer(model=llm_model)
         except ValueError as e:
             print(f"Warning: LLM analyzer unavailable: {e}")
             self.llm_analyzer = None

@@ -40,12 +40,18 @@ from dotenv import load_dotenv
     is_flag=True,
     help='Enable verbose logging'
 )
+@click.option(
+    '--llm',
+    default='openai/o4-mini',
+    help='LLM model to use for executive summary generation (default: openai/o4-mini)'
+)
 def main(
     repo_list_file: Path,
     output_dir: Path,
     format: str,
     env_file: Optional[Path],
-    verbose: bool
+    verbose: bool,
+    llm: str
 ):
     """Analyze GitHub repositories and generate comprehensive reports."""
     
@@ -202,8 +208,9 @@ def main(
         click.echo(f"\n📄 Generating reports...")
         if verbose:
             click.echo("  🤖 Generating LLM-powered executive summary...")
+            click.echo(f"     Using model: {llm}")
         
-        report_generator = ReportGenerator(output_dir)
+        report_generator = ReportGenerator(output_dir, llm_model=llm)
         report_paths = report_generator.generate_reports(analysis_results, format)
         
         click.echo(f"Reports generated:")
