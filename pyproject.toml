@@ -17,6 +17,7 @@ dependencies = [
     "tomli>=2.0.0",
     "pyyaml>=6.0",
     "markdown>=3.4.0",
+    "sentry-sdk>=1.40.0",
 ]
 
 [project.scripts]

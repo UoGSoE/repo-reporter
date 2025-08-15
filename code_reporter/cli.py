@@ -79,6 +79,7 @@ def main(
     from .language_detector import LanguageDetector
     from .github_analyzer import GitHubAnalyzer
     from .dependency_analyzer import DependencyAnalyzer
+    from .sentry_analyzer import SentryAnalyzer
     from .report_generator import ReportGenerator
     
     click.echo("🚀 Starting repository analysis...")
@@ -96,6 +97,10 @@ def main(
     language_detector = LanguageDetector()
     github_analyzer = GitHubAnalyzer()
     dependency_analyzer = DependencyAnalyzer()
+    sentry_analyzer = SentryAnalyzer(
+        auth_token=config['sentry']['auth_token'],
+        organization_slug=os.getenv('SENTRY_ORG_SLUG')
+    )
     
     # Analyze repositories
     analysis_results = {}
@@ -127,6 +132,9 @@ def main(
                     
                     # Analyze GitHub statistics
                     github_stats = github_analyzer.analyze_repository(repo_info.owner, repo_info.name)
+                    
+                    # Analyze Sentry error data
+                    sentry_stats = sentry_analyzer.analyze_repository(repo_info.owner, repo_info.name)
                     
                     # Display results
                     if language_info['primary_language']:
@@ -181,12 +189,32 @@ def main(
                                 if pkg_count > 0:
                                     click.echo(f"     {lang.title()}: {pkg_count} packages" + (f", {dev_count} dev" if dev_count else ""))
                     
+                    # Display Sentry error statistics
+                    if sentry_stats['success'] and sentry_analyzer.enabled:
+                        sentry_issues = sentry_stats['issues']
+                        if sentry_issues['past_month']['total'] > 0:
+                            click.echo(f"  🔥 Sentry errors (past month): {sentry_issues['past_month']['total']} total, {sentry_issues['past_month']['resolved']} resolved")
+                            if sentry_issues['avg_resolution_time']['days'] > 0:
+                                click.echo(f"     Average resolution time: {sentry_issues['avg_resolution_time']['days']} days")
+                            if sentry_issues['events_count'] > 0:
+                                click.echo(f"     Event volume: {sentry_issues['events_count']} events")
+                        else:
+                            click.echo(f"  ✅ Sentry: No errors in past month")
+                        
+                        if verbose and sentry_stats.get('projects'):
+                            project_names = [p['name'] for p in sentry_stats['projects']]
+                            click.echo(f"     Sentry projects: {', '.join(project_names)}")
+                    elif sentry_analyzer.enabled and not sentry_stats['success']:
+                        if verbose:
+                            click.echo(f"  ⚠️ Sentry: {sentry_stats.get('error', 'Analysis failed')}")
+                    
                     analysis_results[repo_url] = {
                         'success': True,
                         'repo_info': repo_info,
                         'language_info': language_info,
                         'github_stats': github_stats,
-                        'dependency_info': dependency_info
+                        'dependency_info': dependency_info,
+                        'sentry_stats': sentry_stats
                     }
                     
                 except Exception as e:
@@ -245,7 +273,8 @@ def validate_config(verbose: bool = False) -> dict:
     # Optional Sentry configuration
     config['sentry'] = {
         'client_key': os.getenv('SENTRY_CLIENT_KEY'),
-        'auth_token': os.getenv('SENTRY_AUTH_TOKEN')
+        'auth_token': os.getenv('SENTRY_AUTH_TOKEN'),
+        'org_slug': os.getenv('SENTRY_ORG_SLUG')
     }
     
     # Optional GitHub token for private repos
@@ -258,6 +287,7 @@ def validate_config(verbose: bool = False) -> dict:
         click.echo(f"  GitHub Token: {'✅' if config['github_token'] else '❌'}")
         click.echo(f"  Sentry Client Key: {'✅' if config['sentry']['client_key'] else '❌'}")
         click.echo(f"  Sentry Auth Token: {'✅' if config['sentry']['auth_token'] else '❌'}")
+        click.echo(f"  Sentry Org Slug: {'✅' if config['sentry']['org_slug'] else '❌'}")
     
     if errors:
         click.echo("❌ Configuration errors:", err=True)

@@ -11,8 +11,9 @@
         .header h1 { color: #007acc; margin: 0; font-size: 3em; }
         .header .subtitle { color: #666; font-size: 1.2em; margin-top: 10px; }
         .executive-summary { background: #f8f9fa; padding: 30px; border-radius: 8px; margin: 30px 0; border-left: 5px solid #007acc; }
-        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 30px 0; }
-        @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 20px; margin: 30px 0; }
+        @media (max-width: 1400px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 600px) { .kpi-grid { grid-template-columns: 1fr; } }
         .kpi-card { background: linear-gradient(135deg, #007acc, #0056b3); color: white; padding: 30px; border-radius: 8px; text-align: center; }
         .kpi-card h3 { margin: 0; font-size: 2.5em; }
@@ -66,6 +67,14 @@
                     <h3>{{ risk_metrics.risk_score }}%</h3>
                     <p>Security Risk Score</p>
                 </div>
+                <div class="kpi-card {% if summary.sentry_metrics.projects_with_errors > 0 %}warning-card{% else %}success-card{% endif %}">
+                    <h3>{{ summary.sentry_metrics.projects_with_sentry }}</h3>
+                    <p>Projects with Sentry</p>
+                </div>
+                <div class="kpi-card {% if summary.sentry_metrics.total_sentry_issues > 0 %}risk-card{% else %}success-card{% endif %}">
+                    <h3>{{ summary.sentry_metrics.total_sentry_issues }}</h3>
+                    <p>Sentry Issues (30d)</p>
+                </div>
             </div>
         </div>
 
@@ -90,6 +99,21 @@
                 <p><strong>Technology Stack:</strong> The portfolio spans {{ summary.languages|length }} primary programming languages with {{ summary.frameworks|length }} different frameworks in use.</p>
                 
                 <p><strong>Development Activity:</strong> Across all projects, there have been {{ summary.activity_metrics.total_commits }} commits in the past month by {{ summary.activity_metrics.total_contributors }} unique contributors, indicating {{ "active" if summary.activity_metrics.total_commits > 10 else "moderate" }} development activity.</p>
+                
+                {% if summary.sentry_metrics.projects_with_sentry > 0 %}
+                    <p><strong>Error Monitoring:</strong> {{ summary.sentry_metrics.projects_with_sentry }} out of {{ summary.successful_analyses }} projects have Sentry error tracking configured. 
+                    {% if summary.sentry_metrics.total_sentry_issues > 0 %}
+                        There were {{ summary.sentry_metrics.total_sentry_issues }} total issues in the past month, with {{ summary.sentry_metrics.total_sentry_resolved }} resolved.
+                        {% if summary.sentry_metrics.avg_resolution_time > 0 %}
+                            Average resolution time is {{ "%.1f"|format(summary.sentry_metrics.avg_resolution_time) }} days.
+                        {% endif %}
+                    {% else %}
+                        No error issues detected in the past month, indicating stable production environments.
+                    {% endif %}
+                    </p>
+                {% else %}
+                    <p><strong>⚠️ Error Monitoring:</strong> No projects have Sentry error tracking configured. Consider implementing error monitoring for better production visibility.</p>
+                {% endif %}
             {% endif %}
         </div>
 

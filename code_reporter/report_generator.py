@@ -122,6 +122,14 @@ class ReportGenerator:
                     'total_contributors': 0,
                     'total_stars': 0,
                     'total_forks': 0
+                },
+                'sentry_metrics': {
+                    'projects_with_sentry': 0,
+                    'total_sentry_issues': 0,
+                    'total_sentry_resolved': 0,
+                    'total_sentry_events': 0,
+                    'avg_resolution_time': 0.0,
+                    'projects_with_errors': 0
                 }
             },
             'charts': {}
@@ -139,6 +147,7 @@ class ReportGenerator:
             language_info = result['language_info']
             github_stats = result.get('github_stats', {})
             dependency_info = result.get('dependency_info', {})
+            sentry_stats = result.get('sentry_stats', {})
             
             project_data = {
                 'success': True,
@@ -153,7 +162,10 @@ class ReportGenerator:
                 'github_commits': github_stats.get('commits', {}),
                 'dependencies': dependency_info.get('dependencies', {}),
                 'vulnerability_summary': dependency_info.get('summary', {}),
-                'vulnerabilities': dependency_info.get('vulnerabilities', [])
+                'vulnerabilities': dependency_info.get('vulnerabilities', []),
+                'sentry_issues': sentry_stats.get('issues', {}),
+                'sentry_projects': sentry_stats.get('projects', []),
+                'sentry_enabled': sentry_stats.get('success', False)
             }
             
             processed['projects'][repo_url] = project_data
@@ -209,6 +221,34 @@ class ReportGenerator:
         vuln_summary = project_data.get('vulnerability_summary', {})
         summary['total_dependencies'] += vuln_summary.get('total_dependencies', 0)
         summary['total_vulnerabilities'] += vuln_summary.get('vulnerable_packages', 0)
+        
+        # Sentry metrics
+        if project_data.get('sentry_enabled'):
+            summary['sentry_metrics']['projects_with_sentry'] += 1
+            
+            sentry_issues = project_data.get('sentry_issues', {})
+            past_month = sentry_issues.get('past_month', {})
+            
+            issues_total = past_month.get('total', 0)
+            issues_resolved = past_month.get('resolved', 0)
+            events_count = sentry_issues.get('events_count', 0)
+            
+            summary['sentry_metrics']['total_sentry_issues'] += issues_total
+            summary['sentry_metrics']['total_sentry_resolved'] += issues_resolved
+            summary['sentry_metrics']['total_sentry_events'] += events_count
+            
+            if issues_total > 0:
+                summary['sentry_metrics']['projects_with_errors'] += 1
+            
+            # Track resolution times for averaging
+            resolution_time = sentry_issues.get('avg_resolution_time', {}).get('days', 0)
+            if resolution_time > 0:
+                # This is a simple average - could be improved with weighted averaging
+                current_avg = summary['sentry_metrics']['avg_resolution_time']
+                projects_count = summary['sentry_metrics']['projects_with_sentry']
+                summary['sentry_metrics']['avg_resolution_time'] = (
+                    (current_avg * (projects_count - 1) + resolution_time) / projects_count
+                )
     
     def _generate_charts(self, processed_data: Dict) -> Dict:
         """Generate chart data for the reports."""
