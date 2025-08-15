@@ -123,7 +123,7 @@ class GitHubAnalyzer:
                 '--repo', f"{owner}/{repo}",
                 '--state', 'closed',
                 '--search', f'closed:>={one_month_ago}',
-                '--json', 'number,closedAt',
+                '--json', 'number,closedAt,createdAt',
                 '--limit', '1000'
             ]
             
@@ -131,13 +131,29 @@ class GitHubAnalyzer:
             closed_data = json.loads(result_closed.stdout)
             resolved_count = len(closed_data)
             
+            # Calculate average resolution time for issues closed in past month
+            resolution_times = []
+            for issue in closed_data:
+                if issue.get('createdAt') and issue.get('closedAt'):
+                    created = datetime.fromisoformat(issue['createdAt'].replace('Z', '+00:00'))
+                    closed = datetime.fromisoformat(issue['closedAt'].replace('Z', '+00:00'))
+                    resolution_time = (closed - created).total_seconds() / 3600  # Convert to hours
+                    resolution_times.append(resolution_time)
+            
+            avg_resolution_hours = sum(resolution_times) / len(resolution_times) if resolution_times else 0
+            avg_resolution_days = avg_resolution_hours / 24 if avg_resolution_hours > 0 else 0
+            
             return {
                 'past_month': {
                     'created': total_issues,
                     'resolved': resolved_count,
                     'still_open': open_issues
                 },
-                'resolution_rate': round(resolved_count / max(total_issues, 1) * 100, 1)
+                'resolution_rate': round(resolved_count / max(total_issues, 1) * 100, 1),
+                'avg_resolution_time': {
+                    'hours': round(avg_resolution_hours, 1),
+                    'days': round(avg_resolution_days, 1)
+                }
             }
             
         except subprocess.CalledProcessError as e:
@@ -145,6 +161,7 @@ class GitHubAnalyzer:
             return {
                 'past_month': {'created': 0, 'resolved': 0, 'still_open': 0},
                 'resolution_rate': 0,
+                'avg_resolution_time': {'hours': 0, 'days': 0},
                 'error': 'Issues not accessible'
             }
     

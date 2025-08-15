@@ -224,30 +224,37 @@ class ReportGenerator:
         fig_security.update_layout(title="Security Overview")
         charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
         
-        # Activity metrics chart
+        # Issue resolution metrics chart
         projects = list(processed_data['projects'].values())
         if projects:
             project_names = [p['name'] for p in projects]
-            stars = [p.get('github_metadata', {}).get('stars', 0) for p in projects]
-            commits = [p.get('github_commits', {}).get('past_month', {}).get('total', 0) for p in projects]
+            issues_created = [p.get('github_issues', {}).get('past_month', {}).get('created', 0) for p in projects]
+            issues_resolved = [p.get('github_issues', {}).get('past_month', {}).get('resolved', 0) for p in projects]
+            avg_resolution_days = [p.get('github_issues', {}).get('avg_resolution_time', {}).get('days', 0) for p in projects]
             
             fig_activity = make_subplots(
                 rows=1, cols=2, 
-                subplot_titles=('Repository Popularity (Stars)', 'Recent Activity (Commits - 30 days)'),
+                subplot_titles=('Issue Management (Past 30 Days)', 'Average Resolution Time (Days)'),
                 specs=[[{"secondary_y": False}, {"secondary_y": False}]]
             )
             
+            # Issues created vs resolved
             fig_activity.add_trace(
-                go.Bar(x=project_names, y=stars, name="Stars"),
+                go.Bar(x=project_names, y=issues_created, name="Issues Created", marker_color='lightblue'),
+                row=1, col=1
+            )
+            fig_activity.add_trace(
+                go.Bar(x=project_names, y=issues_resolved, name="Issues Resolved", marker_color='green'),
                 row=1, col=1
             )
             
+            # Average resolution time
             fig_activity.add_trace(
-                go.Bar(x=project_names, y=commits, name="Commits", marker_color='orange'),
+                go.Bar(x=project_names, y=avg_resolution_days, name="Avg Resolution Time", marker_color='orange'),
                 row=1, col=2
             )
             
-            fig_activity.update_layout(title_text="Project Activity Metrics")
+            fig_activity.update_layout(title_text="Issue Resolution Metrics")
             charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs=False, div_id="activity-chart")
         
         return charts

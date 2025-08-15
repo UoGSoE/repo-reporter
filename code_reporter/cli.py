@@ -153,6 +153,8 @@ def main(
                                 click.echo(f"  📄 License: {metadata['license']}")
                         
                         click.echo(f"  📊 Issues (past month): {issues['past_month']['created']} created, {issues['past_month']['resolved']} resolved")
+                        if issues.get('avg_resolution_time', {}).get('days', 0) > 0:
+                            click.echo(f"     Average resolution time: {issues['avg_resolution_time']['days']} days")
                         click.echo(f"  💻 Commits (past month): {commits['past_month']['total']} commits by {commits['past_month']['unique_authors']} authors")
                         
                         if commits['top_contributors'] and verbose:
