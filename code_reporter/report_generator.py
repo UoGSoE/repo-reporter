@@ -209,7 +209,7 @@ class ReportGenerator:
                 names=list(summary['languages'].keys()),
                 title="Primary Languages Distribution"
             )
-            charts['language_distribution'] = fig_lang.to_html(include_plotlyjs='cdn', div_id="lang-chart")
+            charts['language_distribution'] = fig_lang.to_html(include_plotlyjs=False, div_id="lang-chart")
         
         # Security overview chart
         vuln_projects = sum(1 for p in processed_data['projects'].values() 
@@ -222,7 +222,7 @@ class ReportGenerator:
                    marker_color=['red', 'green'])
         ])
         fig_security.update_layout(title="Security Overview")
-        charts['security_overview'] = fig_security.to_html(include_plotlyjs='cdn', div_id="security-chart")
+        charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
         
         # Activity metrics chart
         projects = list(processed_data['projects'].values())
@@ -248,7 +248,7 @@ class ReportGenerator:
             )
             
             fig_activity.update_layout(title_text="Project Activity Metrics")
-            charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs='cdn', div_id="activity-chart")
+            charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs=False, div_id="activity-chart")
         
         return charts
     

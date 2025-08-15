@@ -22,7 +22,8 @@
         .warning-card { background: linear-gradient(135deg, #fd7e14, #e55100); }
         .section { margin: 40px 0; }
         .section h2 { color: #333; border-left: 4px solid #007acc; padding-left: 15px; font-size: 1.8em; }
-        .chart-container { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .chart-container { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-height: 400px; }
+        .chart-container h3 { margin-top: 0; color: #333; font-size: 1.3em; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
         .project-card { background: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 4px solid #007acc; }
         .project-card.vulnerable { border-left-color: #dc3545; }
@@ -97,20 +98,26 @@
         <div class="section">
             <h2>📈 Analytics Overview</h2>
             
+            <!-- Load Plotly.js once at the top -->
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            
             {% if charts.language_distribution %}
             <div class="chart-container">
+                <h3>Primary Languages Distribution</h3>
                 {{ charts.language_distribution | safe }}
             </div>
             {% endif %}
             
             {% if charts.security_overview %}
             <div class="chart-container">
+                <h3>Security Overview</h3>
                 {{ charts.security_overview | safe }}
             </div>
             {% endif %}
             
             {% if charts.activity_metrics %}
             <div class="chart-container">
+                <h3>Project Activity Metrics</h3>
                 {{ charts.activity_metrics | safe }}
             </div>
             {% endif %}
