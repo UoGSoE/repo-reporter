@@ -98,29 +98,33 @@ Keep it executive-level: strategic, actionable, and focused on business outcomes
     
     def generate_project_summary(self, project_data: Dict) -> str:
         """
-        Generate a brief project description using LLM.
+        Generate a manager-friendly executive summary for a single project.
         
         Args:
             project_data: Individual project analysis data
             
         Returns:
-            Brief project summary
+            Concise executive summary
         """
-        if not project_data.get('github_metadata', {}).get('description'):
-            return "No description available."
-        
-        description = project_data['github_metadata']['description']
-        language = project_data.get('primary_language', 'Unknown')
-        stars = project_data.get('github_metadata', {}).get('stars', 0)
-        
-        prompt = f"""Summarize this software project for a business audience in 1-2 sentences:
+        # Load and render the project summary prompt template
+        try:
+            template = self.jinja_env.get_template('project_summary_prompt.txt')
+            prompt = template.render(
+                project=project_data,
+                project_json=json.dumps(project_data, indent=2)
+            )
+        except Exception as e:
+            # Fallback to simple prompt if template fails
+            description = project_data.get('github_metadata', {}).get('description', 'No description available')
+            language = project_data.get('primary_language', 'Unknown')
+            
+            prompt = f"""Write a 2-3 sentence executive summary for a manager about this software project:
 
 Project: {project_data['name']}
 Description: {description}
 Technology: {language}
-Popularity: {stars} GitHub stars
 
-Write a concise business-focused summary that explains what this project does and why it matters."""
+Focus on business value, current status, and any concerns for management attention. Keep it under 100 words."""
 
         try:
             response = litellm.completion(
@@ -128,14 +132,15 @@ Write a concise business-focused summary that explains what this project does an
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=100,
+                max_tokens=150,
                 temperature=0.3
             )
             
             return response.choices[0].message.content.strip()
             
         except Exception:
-            return description
+            # Final fallback
+            return f"Active {project_data.get('primary_language', 'software')} project with {project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)} dependencies and {project_data.get('vulnerability_summary', {}).get('vulnerable_packages', 0)} security issues."
     
     def _prepare_llm_context(self, processed_data: Dict) -> Dict:
         """Prepare structured context data for LLM analysis."""

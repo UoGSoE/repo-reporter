@@ -1,0 +1,14 @@
+You are writing a concise executive summary for a manager about a single software project. Keep it brief, business-focused, and avoid technical jargon.
+
+PROJECT: {{ project.name }}
+OWNER: {{ project.owner }}
+
+PROJECT DATA:
+{{ project_json }}
+
+Write a 2-3 sentence executive summary that covers:
+- What this project does (in business terms)
+- Current health and activity level
+- Key concerns or highlights for management attention
+
+Focus on business impact, risk assessment, and resource implications. Keep it under 100 words and suitable for a manager who needs the key points quickly.

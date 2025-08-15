@@ -70,6 +70,19 @@ class ReportGenerator:
         # Generate individual project reports
         for repo_url, data in processed_data['projects'].items():
             if data.get('success'):
+                # Generate LLM summary for this project
+                if self.llm_analyzer:
+                    try:
+                        print(f"🤖 Generating project summary for {data['name']}...")
+                        data['llm_project_summary'] = self.llm_analyzer.generate_project_summary(data)
+                        print(f"✅ Project summary generated: {len(data.get('llm_project_summary', ''))} characters")
+                    except Exception as e:
+                        print(f"❌ Project summary generation failed for {data['name']}: {e}")
+                        data['llm_project_summary'] = None
+                else:
+                    print("⚠️ LLM analyzer not available for project summaries")
+                    data['llm_project_summary'] = None
+                    
                 project_html = self._generate_project_report(data)
                 project_filename = self._sanitize_filename(f"{data['name']}_report.html")
                 project_path = self.output_dir / project_filename
@@ -343,6 +356,9 @@ class ReportGenerator:
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .stat-item { text-align: center; padding: 20px; background: #f8f9fa; border-radius: 6px; }
         .stat-number { font-size: 2em; font-weight: bold; color: #007acc; }
+        .executive-summary { background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 20px 0; border-left: 5px solid #007acc; }
+        .llm-summary { line-height: 1.6; }
+        .llm-summary p { margin: 0 0 15px 0; text-align: justify; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; text-align: center; }
     </style>
 </head>
@@ -356,6 +372,18 @@ class ReportGenerator:
                 <strong>Generated:</strong> {{ generated_at }}
             </div>
         </div>
+
+        <!-- Executive Summary -->
+        {% if project.llm_project_summary %}
+        <div class="section">
+            <div class="executive-summary">
+                <h2>📋 Executive Summary</h2>
+                <div class="llm-summary">
+                    {{ project.llm_project_summary | markdown | safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Overview Section -->
         <div class="section">

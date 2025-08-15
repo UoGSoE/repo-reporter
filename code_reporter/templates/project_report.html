@@ -41,6 +41,16 @@
             </div>
         </div>
 
+        <!-- Executive Summary -->
+        {% if project.llm_project_summary %}
+        <div class="section">
+            <h2>📋 Executive Summary</h2>
+            <div class="card">
+                {{ project.llm_project_summary | markdown | safe }}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Overview Section -->
         <div class="section">
             <h2>📊 Project Overview</h2>
