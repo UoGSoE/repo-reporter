@@ -1,0 +1,160 @@
+name: Monthly Code Analysis Reports
+
+# Run on the 1st of every month at 6:00 AM UTC
+on:
+  schedule:
+    - cron: '0 6 1 * *'  
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      llm_model:
+        description: 'LLM model to use for summaries'
+        required: false
+        default: 'openai/gpt-4o-mini'
+        type: string
+
+jobs:
+  generate-reports:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.11"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Create repository list from secret
+        env:
+          REPO_LIST: ${{ secrets.REPO_LIST }}
+        run: |
+          echo "Creating repository list from secrets..."
+          echo "$REPO_LIST" > repos_monthly.txt
+          echo "Repository count: $(wc -l < repos_monthly.txt)"
+          # Log first few repos for verification (without showing private URLs)
+          echo "Sample repositories:"
+          head -3 repos_monthly.txt | sed 's|https://github.com/[^/]*/|https://github.com/[ORG]/|g'
+
+      - name: Configure GitHub CLI for private repositories
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Configuring GitHub CLI..."
+          gh auth setup-git
+          gh auth status
+
+      - name: Run Code Reporter Analysis
+        env:
+          # LLM API Keys
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          
+          # GitHub Integration  
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Sentry Integration (optional)
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG_SLUG: ${{ secrets.SENTRY_ORG_SLUG }}
+          
+          # Configuration
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          echo "🚀 Starting monthly code analysis..."
+          
+          # Create output directory with timestamp
+          OUTPUT_DIR="reports-$(date +%Y-%m-%d)"
+          mkdir -p "$OUTPUT_DIR"
+          
+          # Determine LLM model
+          LLM_MODEL="${{ github.event.inputs.llm_model || 'openai/gpt-4o-mini' }}"
+          echo "Using LLM model: $LLM_MODEL"
+          
+          # Run the analysis
+          uv run python -m code_reporter.cli \
+            --repo-list-file repos_monthly.txt \
+            --output-dir "$OUTPUT_DIR" \
+            --format html \
+            --llm "$LLM_MODEL" \
+            --verbose
+            
+          echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
+          
+          # Generate summary for the workflow
+          echo "## 📊 Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date**: $(date '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repositories Analyzed**: $(wc -l < repos_monthly.txt)" >> $GITHUB_STEP_SUMMARY
+          echo "- **LLM Model**: $LLM_MODEL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reports Generated**: $(ls -1 $OUTPUT_DIR/*.html | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Reports:" >> $GITHUB_STEP_SUMMARY
+          for report in $OUTPUT_DIR/*.html; do
+            filename=$(basename "$report")
+            case "$filename" in
+              "combined_report.html") echo "- 📑 **Combined Report** (Management Overview)" >> $GITHUB_STEP_SUMMARY ;;
+              "executive_summary.html") echo "- 📊 **Executive Summary** (KPI Dashboard)" >> $GITHUB_STEP_SUMMARY ;;
+              *) echo "- 📋 **$(echo $filename | sed 's/_report\.html//' | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1))substr($i,2)}}1')** (Detailed Analysis)" >> $GITHUB_STEP_SUMMARY ;;
+            esac
+          done
+
+      - name: Upload Combined Report (Primary Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-combined-report-${{ github.run_number }}
+          path: ${{ env.OUTPUT_DIR }}/combined_report.html
+          retention-days: 90
+
+      - name: Upload Executive Summary
+        uses: actions/upload-artifact@v4  
+        with:
+          name: monthly-executive-summary-${{ github.run_number }}
+          path: ${{ env.OUTPUT_DIR }}/executive_summary.html
+          retention-days: 90
+
+      - name: Upload All Individual Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-individual-reports-${{ github.run_number }}
+          path: ${{ env.OUTPUT_DIR }}/*_report.html
+          retention-days: 90
+
+      - name: Upload Complete Report Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-reports-complete-${{ github.run_number }}
+          path: ${{ env.OUTPUT_DIR }}/*.html
+          retention-days: 90
+
+      - name: Cleanup
+        run: |
+          echo "🧹 Cleaning up temporary files..."
+          rm -f repos_monthly.txt
+          echo "Cleanup complete"
+
+      - name: Workflow Summary
+        run: |
+          echo "## 🎉 Monthly Reports Generated Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The reports are available as workflow artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📑 **Recommended for Management:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **monthly-combined-report-${{ github.run_number }}** - All projects in one scrollable document" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 **Also Available:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **monthly-executive-summary-${{ github.run_number }}** - KPI dashboard overview" >> $GITHUB_STEP_SUMMARY
+          echo "- **monthly-individual-reports-${{ github.run_number }}** - Detailed per-project reports" >> $GITHUB_STEP_SUMMARY
+          echo "- **monthly-reports-complete-${{ github.run_number }}** - Everything in one package" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Reports will be retained for **90 days** and feature full University of Glasgow branding." >> $GITHUB_STEP_SUMMARY
