@@ -10,6 +10,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 from jinja2 import Environment, FileSystemLoader, Template
 import pandas as pd
+import markdown
 from .llm_analyzer import LLMAnalyzer
 
 
@@ -35,6 +36,17 @@ class ReportGenerator:
             loader=FileSystemLoader(str(self.template_dir)),
             autoescape=True
         )
+        
+        # Add custom markdown filter
+        def markdown_filter(text):
+            """Convert markdown text to HTML."""
+            if not text:
+                return ""
+            # Initialize markdown with common extensions
+            md = markdown.Markdown(extensions=['extra', 'nl2br'])
+            return md.convert(text)
+        
+        self.jinja_env.filters['markdown'] = markdown_filter
         
         # Create templates if they don't exist
         self._ensure_templates()

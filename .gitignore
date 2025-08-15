@@ -1,4 +1,6 @@
 .env
 .DS_Store
 reports/*.md
+reports*
+*.png
 *.md
