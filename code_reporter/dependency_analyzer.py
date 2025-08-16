@@ -489,15 +489,27 @@ class DependencyAnalyzer:
         license_distribution = {}
         license_cache = {}
         
+        print(f"\n🔍 Starting license detection for {len(packages)} packages...")
+        
         for package in packages:
             # Create cache key
             cache_key = f"{package['language']}:{package['name']}"
             
             if cache_key in license_cache:
                 license_info = license_cache[cache_key]
+                print(f"   📋 {package['name']} ({package['language']}): {license_info.get('license', 'Unknown')} [cached]")
             else:
+                print(f"   🔍 Fetching license for {package['name']} ({package['language']})...")
                 license_info = self._get_package_license(package)
                 license_cache[cache_key] = license_info
+                
+                if license_info:
+                    license_name = license_info.get('license', 'Unknown')
+                    print(f"      ✅ Found: {license_name}")
+                    if 'raw_license' in license_info:
+                        print(f"      📄 Raw license text (first 100 chars): {license_info['raw_license'][:100]}...")
+                else:
+                    print(f"      ❌ No license information found")
             
             if license_info:
                 license_name = license_info.get('license', 'Unknown')
@@ -508,6 +520,7 @@ class DependencyAnalyzer:
             else:
                 license_distribution['Unknown'] = license_distribution.get('Unknown', 0) + 1
         
+        print(f"\n📊 License distribution summary: {license_distribution}")
         return license_distribution
     
     def _get_package_license(self, package: Dict) -> Optional[Dict]:
@@ -533,20 +546,22 @@ class DependencyAnalyzer:
         """Clean and normalize license text for display."""
         # If it's a very long license text (full license content), try to extract just the name
         if len(license_text) > 100:
-            # Look for common license patterns at the beginning
-            license_patterns = {
-                r'MIT': 'MIT',
-                r'BSD.*3.*Clause': 'BSD-3-Clause', 
-                r'BSD.*2.*Clause': 'BSD-2-Clause',
-                r'Apache.*2': 'Apache-2.0',
-                r'GPL.*v?3': 'GPL-3.0',
-                r'GPL.*v?2': 'GPL-2.0',
-                r'LGPL': 'LGPL',
-                r'ISC': 'ISC',
-                r'Mozilla': 'MPL'
-            }
+            # Look for common license patterns - order matters!
+            license_patterns = [
+                (r'BSD.*3.*Clause', 'BSD-3-Clause'), 
+                (r'BSD.*2.*Clause', 'BSD-2-Clause'),
+                (r'Copyright.*Redistribution and use in source and binary forms', 'BSD'),
+                (r'Apache.*License.*Version.*2', 'Apache-2.0'),
+                (r'GPL.*v?3', 'GPL-3.0'),
+                (r'GPL.*v?2', 'GPL-2.0'),
+                (r'MIT License', 'MIT'),
+                (r'MIT', 'MIT'),
+                (r'LGPL', 'LGPL'),
+                (r'ISC', 'ISC'),
+                (r'Mozilla', 'MPL')
+            ]
             
-            for pattern, name in license_patterns.items():
+            for pattern, name in license_patterns:
                 if re.search(pattern, license_text, re.IGNORECASE):
                     return name
             
@@ -569,12 +584,28 @@ class DependencyAnalyzer:
                 data = response.json()
                 info = data.get('info', {})
                 
+                # Debug: Show what license info is available
+                license_from_api = info.get('license')
+                classifiers = info.get('classifiers', [])
+                license_classifiers = [c for c in classifiers if c.startswith('License ::')]
+                print(f"      🔎 PyPI response - license field: {repr(license_from_api)}")
+                print(f"      🔎 PyPI response - license classifiers: {license_classifiers}")
+                
                 # Try license field first
-                license_text = info.get('license', '').strip()
+                license_text = info.get('license') or ''
+                if isinstance(license_text, str):
+                    license_text = license_text.strip()
+                else:
+                    license_text = ''
+                
                 if license_text and license_text.lower() not in ['unknown', '', 'none']:
                     # Clean up long license text
                     cleaned_license = self._clean_license_text(license_text)
-                    return {'license': cleaned_license}
+                    return {
+                        'license': cleaned_license,
+                        'raw_license': license_text,
+                        'source': 'pypi_license_field'
+                    }
                 
                 # Fall back to classifiers
                 classifiers = info.get('classifiers', [])
@@ -583,44 +614,50 @@ class DependencyAnalyzer:
                         # Extract license name from classifier
                         license_name = classifier.split('::')[-1].strip()
                         if license_name not in ['Other/Proprietary License']:
-                            return {'license': license_name}
+                            # Normalize common classifier names
+                            if license_name == 'MIT License':
+                                license_name = 'MIT'
+                            elif license_name == 'BSD License':
+                                license_name = 'BSD'
+                            elif license_name == 'Apache Software License':
+                                license_name = 'Apache-2.0'
+                            
+                            return {
+                                'license': license_name,
+                                'raw_license': classifier,
+                                'source': 'pypi_classifier'
+                            }
                 
-                return {'license': 'Unknown'}
+                # Try newer license fields
+                license_expression = info.get('license_expression', '').strip()
+                if license_expression:
+                    return {
+                        'license': license_expression,
+                        'raw_license': license_expression,
+                        'source': 'pypi_license_expression'
+                    }
+                
+                # Debug: Show full info for packages with no license
+                print(f"      🔎 No license found for {package_name}. Available info keys: {list(info.keys())}")
+                license_related_fields = {k: v for k, v in info.items() if 'license' in k.lower()}
+                print(f"      🔎 License-related fields: {license_related_fields}")
+                if 'classifiers' in info:
+                    all_classifiers = info.get('classifiers', [])
+                    print(f"      🔎 All classifiers: {[c for c in all_classifiers if 'license' in c.lower() or 'License' in c]}")
+                
+                return {
+                    'license': 'Unknown',
+                    'raw_license': 'No license info found in PyPI data',
+                    'source': 'pypi_not_found'
+                }
         
-        except Exception:
-            pass
-        
-        return None
-    
-    def _clean_license_text(self, license_text: str) -> str:
-        """Clean and normalize license text for display."""
-        # If it's a very long license text (full license content), try to extract just the name
-        if len(license_text) > 100:
-            # Look for common license patterns at the beginning
-            license_patterns = {
-                r'MIT': 'MIT',
-                r'BSD.*3.*Clause': 'BSD-3-Clause', 
-                r'BSD.*2.*Clause': 'BSD-2-Clause',
-                r'Apache.*2': 'Apache-2.0',
-                r'GPL.*v?3': 'GPL-3.0',
-                r'GPL.*v?2': 'GPL-2.0',
-                r'LGPL': 'LGPL',
-                r'ISC': 'ISC',
-                r'Mozilla': 'MPL'
+        except Exception as e:
+            print(f"      ⚠️ PyPI API error for {package_name}: {str(e)}")
+            return {
+                'license': 'Unknown',
+                'raw_license': f'API Error: {str(e)}',
+                'source': 'pypi_error'
             }
-            
-            for pattern, name in license_patterns.items():
-                if re.search(pattern, license_text, re.IGNORECASE):
-                    return name
-            
-            # If no pattern matches, truncate to first line or first 50 chars
-            first_line = license_text.split('\n')[0].strip()
-            if len(first_line) <= 50:
-                return first_line
-            else:
-                return license_text[:47] + "..."
-        
-        return license_text
     
     def _get_packagist_license(self, package_name: str) -> Optional[Dict]:
         """Get license information from Packagist API."""
@@ -642,14 +679,25 @@ class DependencyAnalyzer:
                     if licenses:
                         # Join multiple licenses with " / "
                         license_text = ' / '.join(licenses)
-                        return {'license': license_text}
+                        return {
+                            'license': license_text,
+                            'raw_license': str(licenses),
+                            'source': 'packagist'
+                        }
                 
-                return {'license': 'Unknown'}
+                return {
+                    'license': 'Unknown',
+                    'raw_license': 'No license info found in Packagist data',
+                    'source': 'packagist_not_found'
+                }
         
-        except Exception:
-            pass
-        
-        return None
+        except Exception as e:
+            print(f"      ⚠️ Packagist API error for {package_name}: {str(e)}")
+            return {
+                'license': 'Unknown',
+                'raw_license': f'API Error: {str(e)}',
+                'source': 'packagist_error'
+            }
     
     def _get_golang_license(self, package_name: str) -> Optional[Dict]:
         """Get license information for Go packages."""
@@ -663,13 +711,24 @@ class DependencyAnalyzer:
                 data = response.json()
                 # This API doesn't provide license info directly
                 # For now, return Unknown for Go packages
-                return {'license': 'Unknown'}
+                return {
+                    'license': 'Unknown',
+                    'raw_license': 'Go packages license detection not implemented yet',
+                    'source': 'golang_not_implemented'
+                }
             
             # Alternative: could try to parse go.mod for license info
             # or use GitHub API if the package is hosted there
-            return {'license': 'Unknown'}
+            return {
+                'license': 'Unknown',
+                'raw_license': 'pkg.go.dev API did not return data',
+                'source': 'golang_api_no_data'
+            }
         
-        except Exception:
-            pass
-        
-        return None
+        except Exception as e:
+            print(f"      ⚠️ Go package API error for {package_name}: {str(e)}")
+            return {
+                'license': 'Unknown',
+                'raw_license': f'API Error: {str(e)}',
+                'source': 'golang_error'
+            }
