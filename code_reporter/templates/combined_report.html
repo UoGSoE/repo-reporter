@@ -129,8 +129,11 @@
                     <p>Projects Analyzed</p>
                 </div>
                 <div class="kpi-card success-card">
-                    <h3>{{ summary.total_dependencies }}</h3>
-                    <p>Total Dependencies</p>
+                    <h3>{{ summary.unique_dependency_count | default(summary.total_dependencies) }}</h3>
+                    <p>Unique Dependencies</p>
+                    {% if summary.unique_dependency_count != summary.total_dependencies %}
+                    <small>({{ summary.total_dependencies }} total usages)</small>
+                    {% endif %}
                 </div>
                 <div class="kpi-card {% if risk_metrics.vulnerable_projects > 0 %}risk-card{% else %}success-card{% endif %}">
                     <h3>{{ risk_metrics.vulnerable_projects }}</h3>
