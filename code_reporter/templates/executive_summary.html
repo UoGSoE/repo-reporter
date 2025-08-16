@@ -145,6 +145,13 @@
                 {{ charts.activity_metrics | safe }}
             </div>
             {% endif %}
+            
+            {% if charts.dependency_license_distribution %}
+            <div class="chart-container">
+                <h3>Dependency License Distribution</h3>
+                {{ charts.dependency_license_distribution | safe }}
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 

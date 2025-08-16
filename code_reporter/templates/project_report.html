@@ -27,6 +27,8 @@
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
         .stat-item { text-align: center; padding: 20px; background: #f8f9fa; border-radius: 6px; }
         .stat-number { font-size: 2em; font-weight: bold; color: #003865; }
+        .chart-container { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-height: 400px; }
+        .chart-container h3 { margin-top: 0; color: #4F5961; font-size: 1.3em; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; text-align: center; }
     </style>
 </head>
@@ -109,6 +111,18 @@
                 </div>
             </div>
         </div>
+
+        <!-- Dependency License Analysis -->
+        {% if dependency_license_chart %}
+        <div class="section">
+            <h2>📄 Dependency Licenses</h2>
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <div class="chart-container">
+                <h3>License Distribution of Dependencies</h3>
+                {{ dependency_license_chart | safe }}
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Security Analysis -->
         <div class="section">

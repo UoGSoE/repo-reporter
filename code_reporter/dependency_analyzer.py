@@ -63,6 +63,9 @@ class DependencyAnalyzer:
         all_packages = self._flatten_dependencies(result['dependencies'])
         result['vulnerabilities'] = self._check_vulnerabilities(all_packages)
         
+        # Collect license information for dependencies
+        result['licenses'] = self._collect_dependency_licenses(all_packages)
+        
         # Update summary
         result['summary']['total_dependencies'] = len(all_packages)
         result['summary']['vulnerable_packages'] = len(result['vulnerabilities'])
@@ -480,3 +483,193 @@ class DependencyAnalyzer:
                 return score.get('score', 'Unknown')
         
         return 'Unknown'
+    
+    def _collect_dependency_licenses(self, packages: List[Dict]) -> Dict:
+        """Collect license information for all dependencies."""
+        license_distribution = {}
+        license_cache = {}
+        
+        for package in packages:
+            # Create cache key
+            cache_key = f"{package['language']}:{package['name']}"
+            
+            if cache_key in license_cache:
+                license_info = license_cache[cache_key]
+            else:
+                license_info = self._get_package_license(package)
+                license_cache[cache_key] = license_info
+            
+            if license_info:
+                license_name = license_info.get('license', 'Unknown')
+                if license_name and license_name != 'Unknown':
+                    license_distribution[license_name] = license_distribution.get(license_name, 0) + 1
+                else:
+                    license_distribution['Unknown'] = license_distribution.get('Unknown', 0) + 1
+            else:
+                license_distribution['Unknown'] = license_distribution.get('Unknown', 0) + 1
+        
+        return license_distribution
+    
+    def _get_package_license(self, package: Dict) -> Optional[Dict]:
+        """Get license information for a package from its registry."""
+        try:
+            language = package['language']
+            name = package['name']
+            
+            if language == 'python':
+                return self._get_pypi_license(name)
+            elif language == 'php':
+                return self._get_packagist_license(name)
+            elif language == 'golang':
+                return self._get_golang_license(name)
+            
+        except Exception:
+            # Don't fail the entire analysis if license lookup fails
+            pass
+        
+        return None
+    
+    def _clean_license_text(self, license_text: str) -> str:
+        """Clean and normalize license text for display."""
+        # If it's a very long license text (full license content), try to extract just the name
+        if len(license_text) > 100:
+            # Look for common license patterns at the beginning
+            license_patterns = {
+                r'MIT': 'MIT',
+                r'BSD.*3.*Clause': 'BSD-3-Clause', 
+                r'BSD.*2.*Clause': 'BSD-2-Clause',
+                r'Apache.*2': 'Apache-2.0',
+                r'GPL.*v?3': 'GPL-3.0',
+                r'GPL.*v?2': 'GPL-2.0',
+                r'LGPL': 'LGPL',
+                r'ISC': 'ISC',
+                r'Mozilla': 'MPL'
+            }
+            
+            for pattern, name in license_patterns.items():
+                if re.search(pattern, license_text, re.IGNORECASE):
+                    return name
+            
+            # If no pattern matches, truncate to first line or first 50 chars
+            first_line = license_text.split('\n')[0].strip()
+            if len(first_line) <= 50:
+                return first_line
+            else:
+                return license_text[:47] + "..."
+        
+        return license_text
+    
+    def _get_pypi_license(self, package_name: str) -> Optional[Dict]:
+        """Get license information from PyPI API."""
+        try:
+            url = f"https://pypi.org/pypi/{package_name}/json"
+            response = self.session.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                info = data.get('info', {})
+                
+                # Try license field first
+                license_text = info.get('license', '').strip()
+                if license_text and license_text.lower() not in ['unknown', '', 'none']:
+                    # Clean up long license text
+                    cleaned_license = self._clean_license_text(license_text)
+                    return {'license': cleaned_license}
+                
+                # Fall back to classifiers
+                classifiers = info.get('classifiers', [])
+                for classifier in classifiers:
+                    if classifier.startswith('License ::'):
+                        # Extract license name from classifier
+                        license_name = classifier.split('::')[-1].strip()
+                        if license_name not in ['Other/Proprietary License']:
+                            return {'license': license_name}
+                
+                return {'license': 'Unknown'}
+        
+        except Exception:
+            pass
+        
+        return None
+    
+    def _clean_license_text(self, license_text: str) -> str:
+        """Clean and normalize license text for display."""
+        # If it's a very long license text (full license content), try to extract just the name
+        if len(license_text) > 100:
+            # Look for common license patterns at the beginning
+            license_patterns = {
+                r'MIT': 'MIT',
+                r'BSD.*3.*Clause': 'BSD-3-Clause', 
+                r'BSD.*2.*Clause': 'BSD-2-Clause',
+                r'Apache.*2': 'Apache-2.0',
+                r'GPL.*v?3': 'GPL-3.0',
+                r'GPL.*v?2': 'GPL-2.0',
+                r'LGPL': 'LGPL',
+                r'ISC': 'ISC',
+                r'Mozilla': 'MPL'
+            }
+            
+            for pattern, name in license_patterns.items():
+                if re.search(pattern, license_text, re.IGNORECASE):
+                    return name
+            
+            # If no pattern matches, truncate to first line or first 50 chars
+            first_line = license_text.split('\n')[0].strip()
+            if len(first_line) <= 50:
+                return first_line
+            else:
+                return license_text[:47] + "..."
+        
+        return license_text
+    
+    def _get_packagist_license(self, package_name: str) -> Optional[Dict]:
+        """Get license information from Packagist API."""
+        try:
+            url = f"https://packagist.org/packages/{package_name}.json"
+            response = self.session.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                package_data = data.get('package', {})
+                
+                # Get latest version info
+                versions = package_data.get('versions', {})
+                if versions:
+                    # Get the most recent stable version
+                    latest_version = next(iter(versions.values()))
+                    licenses = latest_version.get('license', [])
+                    
+                    if licenses:
+                        # Join multiple licenses with " / "
+                        license_text = ' / '.join(licenses)
+                        return {'license': license_text}
+                
+                return {'license': 'Unknown'}
+        
+        except Exception:
+            pass
+        
+        return None
+    
+    def _get_golang_license(self, package_name: str) -> Optional[Dict]:
+        """Get license information for Go packages."""
+        try:
+            # For Go packages, we can try to get license info from pkg.go.dev API
+            # pkg.go.dev provides a JSON API for package metadata
+            url = f"https://api.pkg.go.dev/v1/symbol/{package_name}@latest"
+            response = self.session.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                # This API doesn't provide license info directly
+                # For now, return Unknown for Go packages
+                return {'license': 'Unknown'}
+            
+            # Alternative: could try to parse go.mod for license info
+            # or use GitHub API if the package is hosted there
+            return {'license': 'Unknown'}
+        
+        except Exception:
+            pass
+        
+        return None

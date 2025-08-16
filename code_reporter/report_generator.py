@@ -126,6 +126,7 @@ class ReportGenerator:
                 'languages': {},
                 'frameworks': {},
                 'license_distribution': {},
+                'dependency_license_distribution': {},
                 'activity_metrics': {
                     'total_commits': 0,
                     'total_contributors': 0,
@@ -172,6 +173,7 @@ class ReportGenerator:
                 'dependencies': dependency_info.get('dependencies', {}),
                 'vulnerability_summary': dependency_info.get('summary', {}),
                 'vulnerabilities': dependency_info.get('vulnerabilities', []),
+                'dependency_licenses': dependency_info.get('licenses', {}),
                 'sentry_issues': sentry_stats.get('issues', {}),
                 'sentry_projects': sentry_stats.get('projects', []),
                 'sentry_enabled': sentry_stats.get('success', False)
@@ -231,6 +233,11 @@ class ReportGenerator:
         summary['total_dependencies'] += vuln_summary.get('total_dependencies', 0)
         summary['total_vulnerabilities'] += vuln_summary.get('vulnerable_packages', 0)
         
+        # Aggregate dependency license distribution
+        dep_licenses = project_data.get('dependency_licenses', {})
+        for license_name, count in dep_licenses.items():
+            summary['dependency_license_distribution'][license_name] = summary['dependency_license_distribution'].get(license_name, 0) + count
+        
         # Sentry metrics
         if project_data.get('sentry_enabled'):
             summary['sentry_metrics']['projects_with_sentry'] += 1
@@ -272,6 +279,15 @@ class ReportGenerator:
                 title="Primary Languages Distribution"
             )
             charts['language_distribution'] = fig_lang.to_html(include_plotlyjs=False, div_id="lang-chart")
+        
+        # Dependency license distribution pie chart (executive summary)
+        if summary['dependency_license_distribution']:
+            fig_dep_licenses = px.pie(
+                values=list(summary['dependency_license_distribution'].values()),
+                names=list(summary['dependency_license_distribution'].keys()),
+                title="Dependency License Distribution"
+            )
+            charts['dependency_license_distribution'] = fig_dep_licenses.to_html(include_plotlyjs=False, div_id="dep-license-chart")
         
         # Security overview chart
         vuln_projects = sum(1 for p in processed_data['projects'].values() 
@@ -325,13 +341,25 @@ class ReportGenerator:
         """Generate HTML report for a single project."""
         template = self.jinja_env.get_template('project_report.html')
         
+        # Generate dependency license chart for this project
+        project_dep_license_chart = None
+        dep_licenses = project_data.get('dependency_licenses', {})
+        if dep_licenses:
+            fig_project_dep_licenses = px.pie(
+                values=list(dep_licenses.values()),
+                names=list(dep_licenses.keys()),
+                title="Dependency License Distribution"
+            )
+            project_dep_license_chart = fig_project_dep_licenses.to_html(include_plotlyjs=False, div_id=f"project-dep-license-chart-{project_data['name']}")
+        
         # Prepare template data
         template_data = {
             'project': project_data,
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'has_vulnerabilities': len(project_data.get('vulnerabilities', [])) > 0,
             'vulnerability_count': len(project_data.get('vulnerabilities', [])),
-            'dependency_count': project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)
+            'dependency_count': project_data.get('vulnerability_summary', {}).get('total_dependencies', 0),
+            'dependency_license_chart': project_dep_license_chart
         }
         
         return template.render(**template_data)
