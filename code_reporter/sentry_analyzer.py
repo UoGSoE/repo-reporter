@@ -92,11 +92,7 @@ class SentryAnalyzer:
             resolution_times = []
             
             for project in projects:
-                print(f"🔍 Analyzing Sentry project: {project.get('name')} (slug: {project.get('slug')})")
                 project_data = self._analyze_project(project)
-                print(f"🔍 Project analysis result: success={project_data['success']}")
-                if not project_data['success']:
-                    print(f"🔍 Project analysis failed: {project_data.get('error', 'Unknown error')}")
                 if project_data['success']:
                     # Aggregate issue counts
                     for key in ['total', 'resolved', 'unresolved']:
@@ -152,11 +148,6 @@ class SentryAnalyzer:
         else:
             projects = self._get_organization_projects(self.organization_slug)
         
-        print(f"🔍 Found {len(projects)} total Sentry projects")
-        if projects:
-            project_names = [p.get('name', 'Unknown') for p in projects]
-            print(f"🔍 All project names: {project_names}")
-            print(f"🔍 Looking for matches with repo: {repo_owner}/{repo_name}")
         
         if not projects:
             return []
@@ -165,18 +156,11 @@ class SentryAnalyzer:
         repo_name_lower = repo_name.lower()
         repo_owner_lower = repo_owner.lower()
         
-        print(f"🔍 Searching for repo_name: '{repo_name_lower}' in projects...")
-        
         # Strategy 1: Exact name match
         for project in projects:
             project_name = project.get('name', '').lower()
-            print(f"🔍 Checking exact match: '{project_name}' == '{repo_name_lower}' -> {project_name == repo_name_lower}")
             if project_name == repo_name_lower:
-                print(f"🔍 ✅ Found matching project: {project.get('name')} (slug: {project.get('slug')})")
                 matching_projects.append(project)
-        
-        print(f"🔍 Total matching projects: {len(matching_projects)}")
-        return matching_projects
         
         # Strategy 2: Repository name contained in project name
         if not matching_projects:
@@ -281,22 +265,12 @@ class SentryAnalyzer:
                 'limit': 100
             }
             
-            print(f"🔍 Sentry API call: {url}")
-            print(f"🔍 Sentry params: {params}")
-            
             response = self.session.get(url, params=params)
             response.raise_for_status()
             result = response.json()
-            print(f"🔍 Sentry response: {len(result)} issues found")
-            if result and len(result) > 0:
-                print(f"🔍 Sample issue: {result[0].get('title', 'No title')}")
-            elif isinstance(result, dict) and 'error' in result:
-                print(f"🔍 API error: {result}")
             return result
             
-        except Exception as e:
-            print(f"🔍 Error getting issues for {org_slug}/{project_slug}")
-            print(f"Exception: {str(e)}")
+        except Exception:
             return []
     
     def _get_project_events(self, org_slug: str, project_slug: str,
