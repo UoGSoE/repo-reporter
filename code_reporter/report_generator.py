@@ -122,6 +122,7 @@ class ReportGenerator:
                 'successful_analyses': 0,
                 'failed_analyses': 0,
                 'total_dependencies': 0,
+                'unique_dependencies': set(),
                 'total_vulnerabilities': 0,
                 'languages': {},
                 'frameworks': {},
@@ -184,6 +185,9 @@ class ReportGenerator:
             # Aggregate summary data
             self._update_summary_metrics(processed['summary'], project_data)
         
+        # Convert unique dependencies set to count
+        processed['summary']['unique_dependency_count'] = len(processed['summary']['unique_dependencies'])
+        
         # Generate chart data
         processed['charts'] = self._generate_charts(processed)
         
@@ -232,6 +236,16 @@ class ReportGenerator:
         vuln_summary = project_data.get('vulnerability_summary', {})
         summary['total_dependencies'] += vuln_summary.get('total_dependencies', 0)
         summary['total_vulnerabilities'] += vuln_summary.get('vulnerable_packages', 0)
+        
+        # Track unique dependencies (simple deduplication)
+        dependencies = project_data.get('dependencies', {})
+        for language, dep_categories in dependencies.items():
+            if isinstance(dep_categories, dict):
+                for category, packages in dep_categories.items():
+                    if isinstance(packages, dict):
+                        for package_name in packages.keys():
+                            dep_key = f"{language}:{package_name}"
+                            summary['unique_dependencies'].add(dep_key)
         
         # Aggregate dependency license distribution
         dep_licenses = project_data.get('dependency_licenses', {})
