@@ -64,7 +64,7 @@ class DependencyAnalyzer:
         result['vulnerabilities'] = self._check_vulnerabilities(all_packages)
         
         # Collect license information for dependencies
-        result['licenses'] = self._collect_dependency_licenses(all_packages)
+        result['licenses'] = self._collect_dependency_licenses(all_packages, repo_path, language_info)
         
         # Update summary
         result['summary']['total_dependencies'] = len(all_packages)
@@ -484,12 +484,21 @@ class DependencyAnalyzer:
         
         return 'Unknown'
     
-    def _collect_dependency_licenses(self, packages: List[Dict]) -> Dict:
+    def _collect_dependency_licenses(self, packages: List[Dict], repo_path: Path, language_info: Dict) -> Dict:
         """Collect license information for all dependencies."""
         license_distribution = {}
         license_cache = {}
         
         print(f"\n🔍 Starting license detection for {len(packages)} packages...")
+        
+        # Check if we have PHP packages and try composer licenses first
+        php_packages = [p for p in packages if p['language'] == 'php']
+        composer_licenses = {}
+        
+        if php_packages:
+            composer_licenses = self._get_composer_licenses(repo_path)
+            if composer_licenses:
+                print(f"   🎯 Found composer license data for {len(composer_licenses)} packages")
         
         for package in packages:
             # Create cache key
@@ -499,8 +508,14 @@ class DependencyAnalyzer:
                 license_info = license_cache[cache_key]
                 print(f"   📋 {package['name']} ({package['language']}): {license_info.get('license', 'Unknown')} [cached]")
             else:
-                print(f"   🔍 Fetching license for {package['name']} ({package['language']})...")
-                license_info = self._get_package_license(package)
+                # For PHP packages, check composer data first
+                if package['language'] == 'php' and package['name'] in composer_licenses:
+                    license_info = composer_licenses[package['name']]
+                    print(f"   🎯 {package['name']} ({package['language']}): {license_info.get('license', 'Unknown')} [composer]")
+                else:
+                    print(f"   🔍 Fetching license for {package['name']} ({package['language']})...")
+                    license_info = self._get_package_license(package)
+                
                 license_cache[cache_key] = license_info
                 
                 if license_info:
@@ -529,6 +544,14 @@ class DependencyAnalyzer:
             language = package['language']
             name = package['name']
             
+            # Handle known virtual/meta packages
+            if self._is_virtual_package(name, language):
+                return {
+                    'license': 'Virtual Package',
+                    'raw_license': 'This is a virtual/meta package',
+                    'source': 'virtual_package'
+                }
+            
             if language == 'python':
                 return self._get_pypi_license(name)
             elif language == 'php':
@@ -541,6 +564,107 @@ class DependencyAnalyzer:
             pass
         
         return None
+    
+    def _is_virtual_package(self, name: str, language: str) -> bool:
+        """Check if this is a known virtual/meta package."""
+        virtual_packages = {
+            'php': [
+                'composer-runtime-api',
+                'composer-plugin-api',
+                'php'
+            ],
+            'python': [
+                'python'
+            ],
+            'golang': []
+        }
+        
+        return name in virtual_packages.get(language, [])
+    
+    def _get_composer_licenses(self, repo_path: Path) -> Dict:
+        """Get license information using composer licenses command."""
+        licenses = {}
+        
+        # Check if this is a PHP project with composer and lock file
+        if not (repo_path / 'composer.json').exists():
+            return licenses
+        
+        if not (repo_path / 'composer.lock').exists():
+            print(f"   ℹ️ No composer.lock found - skipping composer licenses (probably a library/framework)")
+            return licenses
+        
+        try:
+            print(f"   🔍 Running composer licenses in {repo_path}...")
+            
+            # First try to run composer install if vendor directory doesn't exist
+            vendor_path = repo_path / 'vendor'
+            if not vendor_path.exists():
+                print(f"   📦 Installing composer dependencies...")
+                install_result = subprocess.run(
+                    ['composer', 'install', '--no-dev', '--quiet'],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minutes for install
+                )
+                if install_result.returncode != 0:
+                    print(f"   ❌ Composer install failed - falling back to API")
+                    return licenses
+            
+            # Run composer licenses command
+            result = subprocess.run(
+                ['composer', 'licenses', '--format=json', '--no-dev'],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if result.returncode == 0:
+                try:
+                    composer_data = json.loads(result.stdout)
+                    dependencies = composer_data.get('dependencies', [])
+                    
+                    for dep in dependencies:
+                        name = dep.get('name', '')
+                        license_list = dep.get('license', [])
+                        
+                        if name and license_list:
+                            # Join multiple licenses with " / "
+                            license_text = ' / '.join(license_list) if isinstance(license_list, list) else str(license_list)
+                            licenses[name] = {
+                                'license': license_text,
+                                'raw_license': str(license_list),
+                                'source': 'composer_command'
+                            }
+                            print(f"      📄 {name}: {license_text}")
+                        elif name:
+                            licenses[name] = {
+                                'license': 'Unknown',
+                                'raw_license': 'No license in composer output',
+                                'source': 'composer_no_license'
+                            }
+                            print(f"      ❓ {name}: No license info")
+                    
+                    print(f"   ✅ Composer licenses parsed: {len(licenses)} packages")
+                    
+                except json.JSONDecodeError as e:
+                    print(f"   ❌ Failed to parse composer licenses JSON: {e}")
+                    print(f"   📄 Raw output: {result.stdout[:200]}...")
+                    
+            else:
+                print(f"   ❌ Composer licenses command failed (exit code {result.returncode})")
+                if result.stderr:
+                    print(f"   📄 Error: {result.stderr[:200]}...")
+                    
+        except subprocess.TimeoutExpired:
+            print(f"   ⏰ Composer licenses command timed out")
+        except FileNotFoundError:
+            print(f"   ❌ Composer command not found - falling back to API")
+        except Exception as e:
+            print(f"   ❌ Composer licenses error: {e}")
+        
+        return licenses
     
     def _clean_license_text(self, license_text: str) -> str:
         """Clean and normalize license text for display."""
