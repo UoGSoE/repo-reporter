@@ -625,9 +625,21 @@ class DependencyAnalyzer:
                     composer_data = json.loads(result.stdout)
                     dependencies = composer_data.get('dependencies', [])
                     
-                    for dep in dependencies:
-                        name = dep.get('name', '')
-                        license_list = dep.get('license', [])
+                    print(f"   🔍 Composer data type: {type(composer_data)}")
+                    print(f"   🔍 Dependencies type: {type(dependencies)}")
+                    if isinstance(dependencies, dict):
+                        print(f"   🔍 Sample dependency keys: {list(dependencies.keys())[:3]}")
+                        if dependencies:
+                            first_key = list(dependencies.keys())[0]
+                            print(f"   🔍 Sample dependency structure: {first_key} -> {dependencies[first_key]}")
+                    else:
+                        print(f"   🔍 First few deps: {dependencies[:2] if len(dependencies) > 0 else 'None'}")
+                    
+                    for name, dep_info in dependencies.items():
+                        if isinstance(dep_info, dict):
+                            license_list = dep_info.get('license', [])
+                        else:
+                            license_list = dep_info if isinstance(dep_info, list) else [dep_info]
                         
                         if name and license_list:
                             # Join multiple licenses with " / "

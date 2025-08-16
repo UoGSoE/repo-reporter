@@ -134,7 +134,11 @@ def main(
                     github_stats = github_analyzer.analyze_repository(repo_info.owner, repo_info.name)
                     
                     # Analyze Sentry error data
+                    if verbose:
+                        click.echo(f"  🔍 Calling Sentry analyzer for {repo_info.owner}/{repo_info.name}...")
                     sentry_stats = sentry_analyzer.analyze_repository(repo_info.owner, repo_info.name)
+                    if verbose:
+                        click.echo(f"  🔍 Sentry result: {sentry_stats.get('success', False)}, projects: {len(sentry_stats.get('projects', []))}")
                     
                     # Display results
                     if language_info['primary_language']:
