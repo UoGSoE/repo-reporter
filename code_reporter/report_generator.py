@@ -282,11 +282,29 @@ class ReportGenerator:
         
         # Dependency license distribution pie chart (executive summary)
         if summary['dependency_license_distribution']:
-            fig_dep_licenses = px.pie(
-                values=list(summary['dependency_license_distribution'].values()),
-                names=list(summary['dependency_license_distribution'].keys()),
-                title="Dependency License Distribution"
-            )
+            print(f"🔍 Executive summary chart data: {summary['dependency_license_distribution']}")
+            # Ensure values are proper native Python integers for Plotly
+            exec_chart_values = [int(v) if v is not None else 0 for v in summary['dependency_license_distribution'].values()]
+            exec_chart_names = list(summary['dependency_license_distribution'].keys())
+            # Force to native Python types to avoid numpy encoding issues
+            exec_chart_values = [int(x) for x in exec_chart_values]
+            print(f"🔍 Executive chart values: {exec_chart_values}, names: {exec_chart_names}")
+            
+            # Create DataFrame explicitly to avoid encoding issues
+            import pandas as pd
+            exec_df = pd.DataFrame({
+                'license': exec_chart_names,
+                'count': exec_chart_values
+            })
+            
+            # Use graph_objects for explicit control over data types
+            fig_dep_licenses = go.Figure(data=[go.Pie(
+                labels=exec_chart_names,
+                values=exec_chart_values,
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Dependencies: %{value}<br>Percentage: %{percent}<extra></extra>'
+            )])
+            fig_dep_licenses.update_layout(title_text="Dependency License Distribution")
             charts['dependency_license_distribution'] = fig_dep_licenses.to_html(include_plotlyjs=False, div_id="dep-license-chart")
         
         # Security overview chart
@@ -345,11 +363,29 @@ class ReportGenerator:
         project_dep_license_chart = None
         dep_licenses = project_data.get('dependency_licenses', {})
         if dep_licenses:
-            fig_project_dep_licenses = px.pie(
-                values=list(dep_licenses.values()),
-                names=list(dep_licenses.keys()),
-                title="Dependency License Distribution"
-            )
+            print(f"🔍 Chart data for {project_data['name']}: {dep_licenses}")
+            # Ensure values are proper native Python integers for Plotly
+            chart_values = [int(v) if v is not None else 0 for v in dep_licenses.values()]
+            chart_names = list(dep_licenses.keys())
+            # Force to native Python types to avoid numpy encoding issues
+            chart_values = [int(x) for x in chart_values]
+            print(f"🔍 Chart values: {chart_values}, names: {chart_names}")
+            
+            # Create DataFrame explicitly to avoid encoding issues
+            import pandas as pd
+            df = pd.DataFrame({
+                'license': chart_names,
+                'count': chart_values
+            })
+            
+            # Use graph_objects for explicit control over data types
+            fig_project_dep_licenses = go.Figure(data=[go.Pie(
+                labels=chart_names,
+                values=chart_values,
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Dependencies: %{value}<br>Percentage: %{percent}<extra></extra>'
+            )])
+            fig_project_dep_licenses.update_layout(title_text="Dependency License Distribution")
             project_dep_license_chart = fig_project_dep_licenses.to_html(include_plotlyjs=False, div_id=f"project-dep-license-chart-{project_data['name']}")
         
         # Prepare template data
