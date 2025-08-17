@@ -9,6 +9,7 @@ from contextlib import contextmanager
 
 import git
 from git import Repo
+from .logger import get_logger
 
 
 class RepositoryManager:
@@ -118,7 +119,8 @@ class RepositoryManager:
                 try:
                     shutil.rmtree(temp_dir)
                 except Exception as e:
-                    print(f"Warning: Failed to cleanup {temp_dir}: {e}")
+                    logger = get_logger()
+                    logger.warning(f"Failed to cleanup {temp_dir}: {e}")
         
         self.temp_dirs.clear()
 

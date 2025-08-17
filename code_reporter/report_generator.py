@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader, Template
 import pandas as pd
 import markdown
 from .llm_analyzer import LLMAnalyzer
+from .logger import get_logger
 
 
 class ReportGenerator:
@@ -25,7 +26,8 @@ class ReportGenerator:
         try:
             self.llm_analyzer = LLMAnalyzer(model=llm_model)
         except ValueError as e:
-            print(f"Warning: LLM analyzer unavailable: {e}")
+            logger = get_logger()
+            logger.warning(f"LLM analyzer unavailable: {e}")
             self.llm_analyzer = None
         
         # Set up Jinja2 environment
@@ -73,14 +75,17 @@ class ReportGenerator:
                 # Generate LLM summary for this project
                 if self.llm_analyzer:
                     try:
-                        print(f"🤖 Generating project summary for {data['name']}...")
+                        logger = get_logger()
+                        logger.debug(f"Generating project summary for {data['name']}")
                         data['llm_project_summary'] = self.llm_analyzer.generate_project_summary(data)
-                        print(f"✅ Project summary generated: {len(data.get('llm_project_summary', ''))} characters")
+                        logger.debug(f"Project summary generated: {len(data.get('llm_project_summary', ''))} characters")
                     except Exception as e:
-                        print(f"❌ Project summary generation failed for {data['name']}: {e}")
+                        logger = get_logger()
+                        logger.warning(f"Project summary generation failed for {data['name']}: {e}")
                         data['llm_project_summary'] = None
                 else:
-                    print("⚠️ LLM analyzer not available for project summaries")
+                    logger = get_logger()
+                    logger.debug("LLM analyzer not available for project summaries")
                     data['llm_project_summary'] = None
                     
                 project_html = self._generate_project_report(data)
@@ -194,14 +199,17 @@ class ReportGenerator:
         # Generate LLM-powered executive summary
         if self.llm_analyzer:
             try:
-                print("🤖 Calling LLM for executive summary...")
+                logger = get_logger()
+                logger.debug("Calling LLM for executive summary")
                 processed['llm_summary'] = self.llm_analyzer.generate_executive_summary(processed)
-                print(f"✅ LLM summary generated: {len(processed.get('llm_summary', ''))} characters")
+                logger.debug(f"LLM summary generated: {len(processed.get('llm_summary', ''))} characters")
             except Exception as e:
-                print(f"❌ LLM summary generation failed: {e}")
+                logger = get_logger()
+                logger.warning(f"LLM summary generation failed: {e}")
                 processed['llm_summary'] = None
         else:
-            print("⚠️ LLM analyzer not available")
+            logger = get_logger()
+            logger.debug("LLM analyzer not available")
             processed['llm_summary'] = None
         
         return processed
@@ -296,13 +304,14 @@ class ReportGenerator:
         
         # Dependency license distribution pie chart (executive summary)
         if summary['dependency_license_distribution']:
-            print(f"🔍 Executive summary chart data: {summary['dependency_license_distribution']}")
+            logger = get_logger()
+            logger.debug(f"Executive summary chart data: {summary['dependency_license_distribution']}")
             # Ensure values are proper native Python integers for Plotly
             exec_chart_values = [int(v) if v is not None else 0 for v in summary['dependency_license_distribution'].values()]
             exec_chart_names = list(summary['dependency_license_distribution'].keys())
             # Force to native Python types to avoid numpy encoding issues
             exec_chart_values = [int(x) for x in exec_chart_values]
-            print(f"🔍 Executive chart values: {exec_chart_values}, names: {exec_chart_names}")
+            logger.debug(f"Executive chart values: {exec_chart_values}, names: {exec_chart_names}")
             
             # Create DataFrame explicitly to avoid encoding issues
             import pandas as pd
@@ -377,13 +386,14 @@ class ReportGenerator:
         project_dep_license_chart = None
         dep_licenses = project_data.get('dependency_licenses', {})
         if dep_licenses:
-            print(f"🔍 Chart data for {project_data['name']}: {dep_licenses}")
+            logger = get_logger()
+            logger.debug(f"Chart data for {project_data['name']}: {dep_licenses}")
             # Ensure values are proper native Python integers for Plotly
             chart_values = [int(v) if v is not None else 0 for v in dep_licenses.values()]
             chart_names = list(dep_licenses.keys())
             # Force to native Python types to avoid numpy encoding issues
             chart_values = [int(x) for x in chart_values]
-            print(f"🔍 Chart values: {chart_values}, names: {chart_names}")
+            logger.debug(f"Chart values: {chart_values}, names: {chart_names}")
             
             # Create DataFrame explicitly to avoid encoding issues
             import pandas as pd

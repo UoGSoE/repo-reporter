@@ -9,6 +9,8 @@ import requests
 import tomli
 import yaml
 
+from .logger import get_logger
+
 
 class DependencyAnalyzer:
     """Analyzes project dependencies and checks for security vulnerabilities."""
@@ -489,7 +491,8 @@ class DependencyAnalyzer:
         license_distribution = {}
         license_cache = {}
         
-        print(f"\n🔍 Starting license detection for {len(packages)} packages...")
+        logger = get_logger()
+        logger.debug(f"Starting license detection for {len(packages)} packages")
         
         # Check if we have PHP packages and try composer licenses first
         php_packages = [p for p in packages if p['language'] == 'php']
@@ -498,7 +501,7 @@ class DependencyAnalyzer:
         if php_packages:
             composer_licenses = self._get_composer_licenses(repo_path)
             if composer_licenses:
-                print(f"   🎯 Found composer license data for {len(composer_licenses)} packages")
+                logger.debug(f"Found composer license data for {len(composer_licenses)} packages")
         
         for package in packages:
             # Create cache key
@@ -506,25 +509,25 @@ class DependencyAnalyzer:
             
             if cache_key in license_cache:
                 license_info = license_cache[cache_key]
-                print(f"   📋 {package['name']} ({package['language']}): {license_info.get('license', 'Unknown')} [cached]")
+                logger.debug(f"License cached: {package['name']} ({package['language']}): {license_info.get('license', 'Unknown')}")
             else:
                 # For PHP packages, check composer data first
                 if package['language'] == 'php' and package['name'] in composer_licenses:
                     license_info = composer_licenses[package['name']]
-                    print(f"   🎯 {package['name']} ({package['language']}): {license_info.get('license', 'Unknown')} [composer]")
+                    logger.debug(f"License from composer: {package['name']} ({package['language']}): {license_info.get('license', 'Unknown')}")
                 else:
-                    print(f"   🔍 Fetching license for {package['name']} ({package['language']})...")
+                    logger.debug(f"Fetching license for {package['name']} ({package['language']})")
                     license_info = self._get_package_license(package)
                 
                 license_cache[cache_key] = license_info
                 
                 if license_info:
                     license_name = license_info.get('license', 'Unknown')
-                    print(f"      ✅ Found: {license_name}")
+                    logger.debug(f"License found: {license_name}")
                     if 'raw_license' in license_info:
-                        print(f"      📄 Raw license text (first 100 chars): {license_info['raw_license'][:100]}...")
+                        logger.debug(f"Raw license text (first 100 chars): {license_info['raw_license'][:100]}...")
                 else:
-                    print(f"      ❌ No license information found")
+                    logger.debug("No license information found")
             
             if license_info:
                 license_name = license_info.get('license', 'Unknown')
@@ -535,7 +538,8 @@ class DependencyAnalyzer:
             else:
                 license_distribution['Unknown'] = license_distribution.get('Unknown', 0) + 1
         
-        print(f"\n📊 License distribution summary: {license_distribution}")
+        logger = get_logger()
+        logger.debug(f"License distribution summary: {license_distribution}")
         return license_distribution
     
     def _get_package_license(self, package: Dict) -> Optional[Dict]:
@@ -590,16 +594,18 @@ class DependencyAnalyzer:
             return licenses
         
         if not (repo_path / 'composer.lock').exists():
-            print(f"   ℹ️ No composer.lock found - skipping composer licenses (probably a library/framework)")
+            logger = get_logger()
+            logger.debug("No composer.lock found - skipping composer licenses")
             return licenses
         
         try:
-            print(f"   🔍 Running composer licenses in {repo_path}...")
+            logger = get_logger()
+            logger.debug(f"Running composer licenses in {repo_path}")
             
             # First try to run composer install if vendor directory doesn't exist
             vendor_path = repo_path / 'vendor'
             if not vendor_path.exists():
-                print(f"   📦 Installing composer dependencies...")
+                logger.debug("Installing composer dependencies")
                 install_result = subprocess.run(
                     ['composer', 'install', '--no-dev', '--quiet'],
                     cwd=repo_path,
@@ -608,7 +614,7 @@ class DependencyAnalyzer:
                     timeout=300  # 5 minutes for install
                 )
                 if install_result.returncode != 0:
-                    print(f"   ❌ Composer install failed - falling back to API")
+                    logger.debug("Composer install failed - falling back to API")
                     return licenses
             
             # Run composer licenses command
@@ -625,15 +631,15 @@ class DependencyAnalyzer:
                     composer_data = json.loads(result.stdout)
                     dependencies = composer_data.get('dependencies', [])
                     
-                    print(f"   🔍 Composer data type: {type(composer_data)}")
-                    print(f"   🔍 Dependencies type: {type(dependencies)}")
+                    logger.debug(f"Composer data type: {type(composer_data)}")
+                    logger.debug(f"Dependencies type: {type(dependencies)}")
                     if isinstance(dependencies, dict):
-                        print(f"   🔍 Sample dependency keys: {list(dependencies.keys())[:3]}")
+                        logger.debug(f"Sample dependency keys: {list(dependencies.keys())[:3]}")
                         if dependencies:
                             first_key = list(dependencies.keys())[0]
-                            print(f"   🔍 Sample dependency structure: {first_key} -> {dependencies[first_key]}")
+                            logger.debug(f"Sample dependency structure: {first_key} -> {dependencies[first_key]}")
                     else:
-                        print(f"   🔍 First few deps: {dependencies[:2] if len(dependencies) > 0 else 'None'}")
+                        logger.debug(f"First few deps: {dependencies[:2] if len(dependencies) > 0 else 'None'}")
                     
                     for name, dep_info in dependencies.items():
                         if isinstance(dep_info, dict):
@@ -649,7 +655,7 @@ class DependencyAnalyzer:
                                 'raw_license': str(license_list),
                                 'source': 'composer_command'
                             }
-                            print(f"      📄 {name}: {license_text}")
+                            logger.debug(f"{name}: {license_text}")
                         elif name:
                             licenses[name] = {
                                 'license': 'Unknown',
@@ -658,16 +664,16 @@ class DependencyAnalyzer:
                             }
                             print(f"      ❓ {name}: No license info")
                     
-                    print(f"   ✅ Composer licenses parsed: {len(licenses)} packages")
+                    logger.debug(f"Composer licenses parsed: {len(licenses)} packages")
                     
                 except json.JSONDecodeError as e:
-                    print(f"   ❌ Failed to parse composer licenses JSON: {e}")
-                    print(f"   📄 Raw output: {result.stdout[:200]}...")
+                    logger.debug(f"Failed to parse composer licenses JSON: {e}")
+                    logger.debug(f"Raw output: {result.stdout[:200]}...")
                     
             else:
                 print(f"   ❌ Composer licenses command failed (exit code {result.returncode})")
                 if result.stderr:
-                    print(f"   📄 Error: {result.stderr[:200]}...")
+                    logger.debug(f"Error: {result.stderr[:200]}...")
                     
         except subprocess.TimeoutExpired:
             print(f"   ⏰ Composer licenses command timed out")

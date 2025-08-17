@@ -9,6 +9,8 @@ from typing import Optional
 import click
 from dotenv import load_dotenv
 
+from .logger import init_logger, get_logger
+
 
 @click.command()
 @click.option(
@@ -61,6 +63,10 @@ def main(
     else:
         load_dotenv()  # Load from .env if it exists
     
+    # Initialize logging
+    init_logger(verbose)
+    logger = get_logger()
+    
     # Validate configuration
     config = validate_config(verbose)
     if not config:
@@ -69,10 +75,9 @@ def main(
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    if verbose:
-        click.echo(f"Repository list: {repo_list_file}")
-        click.echo(f"Output directory: {output_dir}")
-        click.echo(f"Report format: {format}")
+    logger.debug(f"Repository list: {repo_list_file}")
+    logger.debug(f"Output directory: {output_dir}")
+    logger.debug(f"Report format: {format}")
     
     # Import analysis modules
     from .repo_manager import RepositoryManager
@@ -82,15 +87,14 @@ def main(
     from .sentry_analyzer import SentryAnalyzer
     from .report_generator import ReportGenerator
     
-    click.echo("🚀 Starting repository analysis...")
+    logger.info("Starting repository analysis")
     
     # Read repository list
     repos = read_repo_list(repo_list_file)
-    click.echo(f"Found {len(repos)} repositories to analyze")
+    logger.info(f"Found {len(repos)} repositories to analyze")
     
-    if verbose:
-        for repo in repos:
-            click.echo(f"  - {repo}")
+    for repo in repos:
+        logger.debug(f"Repository: {repo}")
     
     # Initialize managers
     repo_manager = RepositoryManager(github_token=config['github_token'])
@@ -106,16 +110,15 @@ def main(
     analysis_results = {}
     
     def progress_callback(message):
-        if verbose:
-            click.echo(f"  {message}")
+        logger.debug(message)
     
     try:
         with repo_manager.clone_repositories(repos, progress_callback) as repo_infos:
             for repo_url, repo_info in repo_infos.items():
-                click.echo(f"\n📊 Analyzing {repo_info.full_name}...")
+                logger.info(f"Analyzing {repo_info.full_name}")
                 
                 if not repo_info.success:
-                    click.echo(f"  ❌ Failed to clone: {repo_info.error}")
+                    logger.info(f"Failed to clone {repo_info.full_name}: {repo_info.error}")
                     analysis_results[repo_url] = {
                         'success': False,
                         'error': repo_info.error,
@@ -134,24 +137,22 @@ def main(
                     github_stats = github_analyzer.analyze_repository(repo_info.owner, repo_info.name)
                     
                     # Analyze Sentry error data
-                    if verbose:
-                        click.echo(f"  🔍 Calling Sentry analyzer for {repo_info.owner}/{repo_info.name}...")
+                    logger.debug(f"Calling Sentry analyzer for {repo_info.owner}/{repo_info.name}")
                     sentry_stats = sentry_analyzer.analyze_repository(repo_info.owner, repo_info.name)
-                    if verbose:
-                        click.echo(f"  🔍 Sentry result: {sentry_stats.get('success', False)}, projects: {len(sentry_stats.get('projects', []))}")
+                    logger.debug(f"Sentry analysis result: success={sentry_stats.get('success', False)}, projects={len(sentry_stats.get('projects', []))}")
                     
                     # Display results
                     if language_info['primary_language']:
                         primary = language_info['languages'][language_info['primary_language']]
-                        click.echo(f"  🔤 Primary language: {language_info['primary_language'].title()}")
+                        logger.debug(f"Primary language: {language_info['primary_language'].title()}")
                         
                         if primary.get('version'):
-                            click.echo(f"     Version: {primary['version']}")
+                            logger.debug(f"Language version: {primary['version']}")
                         
                         if primary.get('frameworks'):
                             for framework, info in primary['frameworks'].items():
                                 version_info = f" (v{info['version']})" if info['version'] != 'unknown' else ""
-                                click.echo(f"     Framework: {framework.title()}{version_info}")
+                                logger.debug(f"Framework: {framework.title()}{version_info}")
                     
                     # Display GitHub statistics
                     if github_stats['success']:
@@ -159,58 +160,55 @@ def main(
                         issues = github_stats['issues']
                         commits = github_stats['commits']
                         
-                        if verbose:
-                            click.echo(f"  ⭐ {metadata.get('stars', 0)} stars, {metadata.get('forks', 0)} forks")
-                            if metadata.get('license'):
-                                click.echo(f"  📄 License: {metadata['license']}")
+                        logger.debug(f"GitHub stats: {metadata.get('stars', 0)} stars, {metadata.get('forks', 0)} forks")
+                        if metadata.get('license'):
+                            logger.debug(f"License: {metadata['license']}")
                         
-                        click.echo(f"  📊 Issues (past month): {issues['past_month']['created']} created, {issues['past_month']['resolved']} resolved")
+                        logger.debug(f"Issues (past month): {issues['past_month']['created']} created, {issues['past_month']['resolved']} resolved")
                         if issues.get('avg_resolution_time', {}).get('days', 0) > 0:
-                            click.echo(f"     Average resolution time: {issues['avg_resolution_time']['days']} days")
-                        click.echo(f"  💻 Commits (past month): {commits['past_month']['total']} commits by {commits['past_month']['unique_authors']} authors")
+                            logger.debug(f"Average issue resolution time: {issues['avg_resolution_time']['days']} days")
+                        logger.debug(f"Commits (past month): {commits['past_month']['total']} commits by {commits['past_month']['unique_authors']} authors")
                         
-                        if commits['top_contributors'] and verbose:
-                            click.echo(f"     Top contributor: {commits['top_contributors'][0]['name']} ({commits['top_contributors'][0]['commits']} commits)")
+                        if commits['top_contributors']:
+                            logger.debug(f"Top contributor: {commits['top_contributors'][0]['name']} ({commits['top_contributors'][0]['commits']} commits)")
                     
                     # Display dependency and security information
                     summary = dependency_info['summary']
-                    click.echo(f"  📦 Dependencies: {summary['total_dependencies']} total")
+                    logger.debug(f"Dependencies: {summary['total_dependencies']} total")
                     
                     if summary['vulnerable_packages'] > 0:
-                        click.echo(f"  🚨 Security alerts: {summary['vulnerable_packages']} vulnerable packages")
-                        if verbose:
-                            for vuln in dependency_info['vulnerabilities'][:3]:  # Show first 3
-                                severity = vuln['vulnerability']['severity']
-                                click.echo(f"     - {vuln['package']} v{vuln['version']}: {vuln['vulnerability']['summary'][:60]}...")
+                        logger.debug(f"Security alerts: {summary['vulnerable_packages']} vulnerable packages")
+                        for vuln in dependency_info['vulnerabilities'][:3]:  # Show first 3
+                            severity = vuln['vulnerability']['severity']
+                            logger.debug(f"Vulnerability: {vuln['package']} v{vuln['version']}: {vuln['vulnerability']['summary'][:60]}...")
                     else:
-                        click.echo(f"  ✅ Security: No known vulnerabilities found")
+                        logger.debug(f"Security: No known vulnerabilities found")
                     
-                    if verbose and dependency_info['dependencies']:
+                    if dependency_info['dependencies']:
                         for lang, lang_deps in dependency_info['dependencies'].items():
                             if lang_deps.get('detected'):
                                 pkg_count = len(lang_deps.get('packages', {}))
                                 dev_count = len(lang_deps.get('dev_packages', {}))
                                 if pkg_count > 0:
-                                    click.echo(f"     {lang.title()}: {pkg_count} packages" + (f", {dev_count} dev" if dev_count else ""))
+                                    logger.debug(f"{lang.title()} dependencies: {pkg_count} packages" + (f", {dev_count} dev" if dev_count else ""))
                     
                     # Display Sentry error statistics
                     if sentry_stats['success'] and sentry_analyzer.enabled:
                         sentry_issues = sentry_stats['issues']
                         if sentry_issues['past_month']['total'] > 0:
-                            click.echo(f"  🔥 Sentry errors (past month): {sentry_issues['past_month']['total']} total, {sentry_issues['past_month']['resolved']} resolved")
+                            logger.debug(f"Sentry errors (past month): {sentry_issues['past_month']['total']} total, {sentry_issues['past_month']['resolved']} resolved")
                             if sentry_issues['avg_resolution_time']['days'] > 0:
-                                click.echo(f"     Average resolution time: {sentry_issues['avg_resolution_time']['days']} days")
+                                logger.debug(f"Average Sentry resolution time: {sentry_issues['avg_resolution_time']['days']} days")
                             if sentry_issues['events_count'] > 0:
-                                click.echo(f"     Event volume: {sentry_issues['events_count']} events")
+                                logger.debug(f"Sentry event volume: {sentry_issues['events_count']} events")
                         else:
-                            click.echo(f"  ✅ Sentry: No errors in past month")
+                            logger.debug(f"Sentry: No errors in past month")
                         
-                        if verbose and sentry_stats.get('projects'):
+                        if sentry_stats.get('projects'):
                             project_names = [p['name'] for p in sentry_stats['projects']]
-                            click.echo(f"     Sentry projects: {', '.join(project_names)}")
+                            logger.debug(f"Sentry projects: {', '.join(project_names)}")
                     elif sentry_analyzer.enabled and not sentry_stats['success']:
-                        if verbose:
-                            click.echo(f"  ⚠️ Sentry: {sentry_stats.get('error', 'Analysis failed')}")
+                        logger.debug(f"Sentry analysis failed: {sentry_stats.get('error', 'Analysis failed')}")
                     
                     analysis_results[repo_url] = {
                         'success': True,
@@ -222,7 +220,7 @@ def main(
                     }
                     
                 except Exception as e:
-                    click.echo(f"  ❌ Analysis failed: {str(e)}")
+                    logger.info(f"Analysis failed for {repo_info.full_name}: {str(e)}")
                     analysis_results[repo_url] = {
                         'success': False,
                         'error': str(e),
@@ -235,28 +233,27 @@ def main(
     
     # Summary
     successful = sum(1 for result in analysis_results.values() if result['success'])
-    click.echo(f"\n✅ Analysis complete! Successfully analyzed {successful}/{len(repos)} repositories")
+    logger.debug(f"Analysis complete: {successful}/{len(repos)} repositories successful")
     
     # Generate reports if we have successful analyses
     if successful > 0:
-        click.echo(f"\n📄 Generating reports...")
-        if verbose:
-            click.echo("  🤖 Generating LLM-powered executive summary...")
-            click.echo(f"     Using model: {llm}")
+        logger.debug("Generating reports")
+        logger.debug("Generating LLM-powered executive summary")
+        logger.debug(f"Using model: {llm}")
         
         report_generator = ReportGenerator(output_dir, llm_model=llm)
         report_paths = report_generator.generate_reports(analysis_results, format)
         
-        click.echo(f"Reports generated:")
+        logger.debug("Reports generated:")
         for report_type, path in report_paths.items():
             if report_type == 'executive_summary':
-                click.echo(f"  📊 Executive Summary: {path}")
+                logger.debug(f"Executive Summary: {path}")
             elif report_type == 'combined_report':
-                click.echo(f"  📑 Combined Report (All Projects): {path}")
+                logger.debug(f"Combined Report: {path}")
             else:
-                click.echo(f"  📋 {report_type.replace('https://github.com/', '')}: {path}")
+                logger.debug(f"Project Report ({report_type.replace('https://github.com/', '')}): {path}")
         
-        click.echo(f"\n🎉 All reports saved to: {output_dir}")
+        logger.info(f"All reports saved to: {output_dir}")
 
 
 def validate_config(verbose: bool = False) -> dict:
@@ -287,18 +284,19 @@ def validate_config(verbose: bool = False) -> dict:
     config['github_token'] = os.getenv('GITHUB_TOKEN')
     
     if verbose:
-        click.echo("Configuration status:")
-        click.echo(f"  OpenAI API Key: {'✅' if openai_key else '❌'}")
-        click.echo(f"  Anthropic API Key: {'✅' if anthropic_key else '❌'}")
-        click.echo(f"  GitHub Token: {'✅' if config['github_token'] else '❌'}")
-        click.echo(f"  Sentry Client Key: {'✅' if config['sentry']['client_key'] else '❌'}")
-        click.echo(f"  Sentry Auth Token: {'✅' if config['sentry']['auth_token'] else '❌'}")
-        click.echo(f"  Sentry Org Slug: {'✅' if config['sentry']['org_slug'] else '❌'}")
+        logger = get_logger()
+        logger.debug("Configuration status:")
+        logger.debug(f"  OpenAI API Key: {'✅' if openai_key else '❌'}")
+        logger.debug(f"  Anthropic API Key: {'✅' if anthropic_key else '❌'}")
+        logger.debug(f"  GitHub Token: {'✅' if config['github_token'] else '❌'}")
+        logger.debug(f"  Sentry Client Key: {'✅' if config['sentry']['client_key'] else '❌'}")
+        logger.debug(f"  Sentry Auth Token: {'✅' if config['sentry']['auth_token'] else '❌'}")
+        logger.debug(f"  Sentry Org Slug: {'✅' if config['sentry']['org_slug'] else '❌'}")
     
     if errors:
-        click.echo("❌ Configuration errors:", err=True)
+        print("❌ Configuration errors:", file=sys.stderr)
         for error in errors:
-            click.echo(f"  - {error}", err=True)
+            print(f"  - {error}", file=sys.stderr)
         return None
     
     return config
@@ -314,7 +312,7 @@ def read_repo_list(file_path: Path) -> list[str]:
             if line and not line.startswith('#'):
                 # Basic URL validation
                 if not (line.startswith('https://github.com/') or line.startswith('git@github.com:')):
-                    click.echo(f"⚠️ Warning: Line {line_num} doesn't look like a GitHub URL: {line}")
+                    print(f"⚠️ Warning: Line {line_num} doesn't look like a GitHub URL: {line}", file=sys.stderr)
                 repos.append(line)
     
     return repos
