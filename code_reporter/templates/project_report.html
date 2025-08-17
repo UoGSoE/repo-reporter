@@ -1,218 +1,311 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ project.name }} - Code Analysis Report</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { border-bottom: 3px solid #003865; padding-bottom: 20px; margin-bottom: 30px; }
-        .header h1 { color: #003865; margin: 0; font-size: 2.5em; }
-        .header .meta { color: #4F5961; margin-top: 10px; }
-        .section { margin: 30px 0; }
-        .section h2 { color: #4F5961; border-left: 4px solid #003865; padding-left: 15px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .card { background: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 4px solid #003865; }
-        .vulnerability { background: #fff5f5; border-left-color: #dc3545; padding: 15px; margin: 10px 0; border-radius: 4px; }
-        .vulnerability.high { background: #fff0f0; border-left-color: #7D2239; }
-        .vulnerability.medium { background: #fff8f0; border-left-color: #BE4D00; }
-        .vulnerability.low { background: #f0f8f0; border-left-color: #00843D; }
-        .secure { color: #00843D; font-weight: bold; }
-        .warning { color: #7D2239; font-weight: bold; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
-        .badge.success { background: #e8f5e8; color: #00843D; }
-        .badge.danger { background: #f8e8ea; color: #7D2239; }
-        .badge.warning { background: #fff8f0; color: #BE4D00; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-        .stat-item { text-align: center; padding: 20px; background: #f8f9fa; border-radius: 6px; }
-        .stat-number { font-size: 2em; font-weight: bold; color: #003865; }
-        .chart-container { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-height: 400px; }
-        .chart-container h3 { margin-top: 0; color: #4F5961; font-size: 1.3em; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; text-align: center; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>{{ project.name }}</h1>
-            <div class="meta">
-                <strong>Owner:</strong> {{ project.owner }} | 
-                <strong>URL:</strong> <a href="{{ project.url }}" target="_blank">{{ project.url }}</a> |
-                <strong>Generated:</strong> {{ generated_at }}
-            </div>
-        </div>
+{% extends "base.html" %}
 
-        <!-- Executive Summary -->
-        {% if project.llm_project_summary %}
-        <div class="section">
-            <h2>📋 Executive Summary</h2>
-            <div class="card">
-                {{ project.llm_project_summary | markdown | safe }}
-            </div>
-        </div>
-        {% endif %}
+{% block title %}{{ project.name }} - Code Analysis Report{% endblock %}
 
-        <!-- Overview Section -->
-        <div class="section">
-            <h2>📊 Project Overview</h2>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-number">{{ project.github_metadata.stars | default(0) }}</div>
-                    <div>Stars</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">{{ project.github_metadata.forks | default(0) }}</div>
-                    <div>Forks</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">{{ dependency_count }}</div>
-                    <div>Dependencies</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number {% if vulnerability_count > 0 %}warning{% else %}secure{% endif %}">{{ vulnerability_count }}</div>
-                    <div>Vulnerabilities</div>
-                </div>
-            </div>
-        </div>
+{% block header_title %}{{ project.name }}{% endblock %}
+{% block header_subtitle %}{{ project.owner }}{% endblock %}
+{% block header_meta %}
+<div class="flex justify-center items-center space-x-4 text-sm">
+    <span>🔗 <a href="{{ project.url }}" target="_blank" class="underline hover:text-blue-200">{{ project.url }}</a></span>
+    <span>📅 Generated: {{ generated_at }}</span>
+</div>
+{% endblock %}
 
-        <!-- Technology Stack -->
-        <div class="section">
-            <h2>🔧 Technology Stack</h2>
-            <div class="grid">
-                <div class="card">
-                    <h3>Primary Language</h3>
-                    <p><strong>{{ project.primary_language | title }}</strong></p>
-                    {% if project.language_details[project.primary_language] %}
-                        {% set lang_data = project.language_details[project.primary_language] %}
-                        {% if lang_data.version %}
-                            <p>Version: {{ lang_data.version }}</p>
-                        {% endif %}
-                        {% if lang_data.frameworks %}
-                            <p><strong>Frameworks:</strong></p>
-                            <ul>
-                            {% for framework, info in lang_data.frameworks.items() %}
-                                <li>{{ framework | title }} 
-                                    {% if info.version != 'unknown' %}(v{{ info.version }}){% endif %}
-                                </li>
-                            {% endfor %}
-                            </ul>
-                        {% endif %}
-                    {% endif %}
-                </div>
-                <div class="card">
-                    <h3>Repository Info</h3>
-                    {% if project.github_metadata.license %}
-                        <p><strong>License:</strong> {{ project.github_metadata.license }}</p>
-                    {% endif %}
-                    {% if project.github_metadata.description %}
-                        <p><strong>Description:</strong> {{ project.github_metadata.description }}</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+{% block content %}
+<!-- Executive Summary -->
+{% if project.llm_project_summary %}
+<div class="bg-gradient-to-r from-uog-light-slate to-gray-50 p-8 rounded-xl border-l-4 border-uog-blue mb-8 print-avoid-break">
+    <h2 class="text-2xl font-bold text-uog-slate mb-6 flex items-center">
+        <span class="mr-3">📋</span>
+        Executive Summary
+    </h2>
+    <div class="prose prose-lg max-w-none text-gray-700 leading-relaxed">
+        {{ project.llm_project_summary | markdown | safe }}
+    </div>
+</div>
+{% endif %}
 
-        <!-- Dependency License Analysis -->
-        {% if dependency_license_chart %}
-        <div class="section">
-            <h2>📄 Dependency Licenses</h2>
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-            <div class="chart-container">
-                <h3>License Distribution of Dependencies</h3>
-                {{ dependency_license_chart | safe }}
-            </div>
+<!-- Overview Section -->
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-uog-slate mb-6 border-l-4 border-uog-blue pl-4">
+        📊 Project Overview
+    </h2>
+    
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-lg text-center border border-gray-200 print-avoid-break">
+            <div class="text-3xl font-bold text-uog-blue mb-2">{{ project.github_metadata.stars | default(0) }}</div>
+            <div class="text-sm text-gray-600">Stars</div>
         </div>
-        {% endif %}
-
-        <!-- Security Analysis -->
-        <div class="section">
-            <h2>🛡️ Security Analysis</h2>
-            {% if has_vulnerabilities %}
-                <p class="warning">⚠️ {{ vulnerability_count }} security vulnerabilities found</p>
-                {% for vuln in project.vulnerabilities[:10] %}
-                    <div class="vulnerability">
-                        <h4>{{ vuln.package }} v{{ vuln.version }}</h4>
-                        <p>{{ vuln.vulnerability.summary }}</p>
-                        <p><strong>Severity:</strong> <span class="badge {% if 'high' in vuln.vulnerability.severity.lower() %}danger{% elif 'medium' in vuln.vulnerability.severity.lower() %}warning{% else %}success{% endif %}">{{ vuln.vulnerability.severity }}</span></p>
-                        {% if vuln.vulnerability.id %}
-                            <p><strong>ID:</strong> {{ vuln.vulnerability.id }}</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p class="secure">✅ No known security vulnerabilities found</p>
-            {% endif %}
+        
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-lg text-center border border-gray-200 print-avoid-break">
+            <div class="text-3xl font-bold text-uog-blue mb-2">{{ project.github_metadata.forks | default(0) }}</div>
+            <div class="text-sm text-gray-600">Forks</div>
         </div>
-
-        <!-- Activity Metrics -->
-        <div class="section">
-            <h2>📈 Recent Activity (Past 30 Days)</h2>
-            <div class="grid">
-                <div class="card">
-                    <h3>Development Activity</h3>
-                    <p><strong>Commits:</strong> {{ project.github_commits.past_month.total | default(0) }}</p>
-                    <p><strong>Contributors:</strong> {{ project.github_commits.past_month.unique_authors | default(0) }}</p>
-                    {% if project.github_commits.top_contributors %}
-                        <p><strong>Top Contributor:</strong> {{ project.github_commits.top_contributors[0].name }} ({{ project.github_commits.top_contributors[0].commits }} commits)</p>
-                    {% endif %}
-                </div>
-                <div class="card">
-                    <h3>Issue Management</h3>
-                    <p><strong>Issues Created:</strong> {{ project.github_issues.past_month.created | default(0) }}</p>
-                    <p><strong>Issues Resolved:</strong> {{ project.github_issues.past_month.resolved | default(0) }}</p>
-                    <p><strong>Resolution Rate:</strong> {{ project.github_issues.resolution_rate | default(0) }}%</p>
-                </div>
-            </div>
+        
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-lg text-center border border-gray-200 print-avoid-break">
+            <div class="text-3xl font-bold text-uog-blue mb-2">{{ dependency_count }}</div>
+            <div class="text-sm text-gray-600">Dependencies</div>
         </div>
-
-        <!-- Sentry Error Tracking -->
-        {% if project.sentry_enabled %}
-        <div class="section">
-            <h2>🔥 Error Tracking (Sentry)</h2>
-            <div class="grid">
-                <div class="card">
-                    <h3>Error Statistics</h3>
-                    <p><strong>Total Issues:</strong> <span class="{% if project.sentry_issues.past_month.total > 0 %}warning{% else %}secure{% endif %}">{{ project.sentry_issues.past_month.total | default(0) }}</span></p>
-                    <p><strong>Resolved Issues:</strong> {{ project.sentry_issues.past_month.resolved | default(0) }}</p>
-                    <p><strong>Unresolved Issues:</strong> <span class="{% if project.sentry_issues.past_month.unresolved > 0 %}warning{% else %}secure{% endif %}">{{ project.sentry_issues.past_month.unresolved | default(0) }}</span></p>
-                    <p><strong>Event Volume:</strong> {{ project.sentry_issues.events_count | default(0) }}</p>
-                </div>
-                <div class="card">
-                    <h3>Resolution Metrics</h3>
-                    {% if project.sentry_issues.avg_resolution_time.days > 0 %}
-                        <p><strong>Avg Resolution Time:</strong> {{ project.sentry_issues.avg_resolution_time.days }} days</p>
-                    {% else %}
-                        <p><strong>Avg Resolution Time:</strong> <span class="secure">N/A</span></p>
-                    {% endif %}
-                    
-                    {% if project.sentry_projects %}
-                        <p><strong>Sentry Projects:</strong></p>
-                        <ul>
-                        {% for sentry_project in project.sentry_projects %}
-                            <li>{{ sentry_project.name }}
-                                {% if sentry_project.platform != 'unknown' %}
-                                    <span class="badge success">{{ sentry_project.platform }}</span>
-                                {% endif %}
-                            </li>
-                        {% endfor %}
-                        </ul>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        {% else %}
-        <div class="section">
-            <h2>🔥 Error Tracking</h2>
-            <div class="card">
-                <p>⚠️ Sentry integration not configured or no matching projects found.</p>
-                <p><small>To enable error tracking, configure SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG environment variables.</small></p>
-            </div>
-        </div>
-        {% endif %}
-
-        <div class="footer">
-            <p>Generated by Code Reporter on {{ generated_at }}</p>
+        
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-lg text-center border border-gray-200 print-avoid-break">
+            <div class="text-3xl font-bold {% if vulnerability_count > 0 %}text-uog-burgundy{% else %}text-uog-leaf{% endif %} mb-2">{{ vulnerability_count }}</div>
+            <div class="text-sm text-gray-600">Vulnerabilities</div>
         </div>
     </div>
-</body>
-</html>
+</div>
+
+<!-- Technology Stack -->
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-uog-slate mb-6 border-l-4 border-uog-blue pl-4">
+        🔧 Technology Stack
+    </h2>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
+            <h3 class="text-xl font-semibold text-uog-slate mb-4">Primary Language</h3>
+            <div class="space-y-3">
+                <p class="text-lg font-medium text-uog-blue">{{ project.primary_language | title }}</p>
+                {% if project.language_details[project.primary_language] %}
+                    {% set lang_data = project.language_details[project.primary_language] %}
+                    {% if lang_data.version %}
+                        <p class="text-gray-600"><span class="font-medium">Version:</span> {{ lang_data.version }}</p>
+                    {% endif %}
+                    {% if lang_data.frameworks %}
+                        <div>
+                            <p class="font-medium text-gray-700 mb-2">Frameworks:</p>
+                            <div class="space-y-1">
+                            {% for framework, info in lang_data.frameworks.items() %}
+                                <div class="flex items-center justify-between bg-gray-100 px-3 py-2 rounded">
+                                    <span class="text-gray-700">{{ framework | title }}</span>
+                                    {% if info.version != 'unknown' %}
+                                        <span class="text-xs bg-uog-blue text-white px-2 py-1 rounded">v{{ info.version }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
+            <h3 class="text-xl font-semibold text-uog-slate mb-4">Repository Information</h3>
+            <div class="space-y-3">
+                {% if project.github_metadata.license %}
+                    <p><span class="font-medium text-gray-700">License:</span> 
+                       <span class="inline-block bg-green-100 text-uog-leaf px-2 py-1 rounded text-sm">{{ project.github_metadata.license }}</span>
+                    </p>
+                {% endif %}
+                {% if project.github_metadata.description %}
+                    <p><span class="font-medium text-gray-700">Description:</span> {{ project.github_metadata.description }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dependency License Analysis -->
+{% if dependency_license_chart %}
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-uog-slate mb-6 border-l-4 border-uog-blue pl-4">
+        📄 Dependency Licenses
+    </h2>
+    <div class="bg-white p-6 rounded-xl shadow-md print-avoid-break">
+        <h3 class="text-xl font-semibold text-uog-slate mb-4 border-b pb-2">License Distribution of Dependencies</h3>
+        <div class="min-h-[400px]">
+            {{ dependency_license_chart | safe }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Security Analysis -->
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-uog-slate mb-6 border-l-4 border-uog-blue pl-4">
+        🛡️ Security Analysis
+    </h2>
+    
+    {% if has_vulnerabilities %}
+        <div class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+            <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">⚠️</span>
+                <h3 class="text-xl font-semibold text-uog-burgundy">{{ vulnerability_count }} Security Vulnerabilities Found</h3>
+            </div>
+        </div>
+        
+        <div class="space-y-4">
+            {% for vuln in project.vulnerabilities[:10] %}
+                <div class="bg-white border-l-4 {% if 'high' in vuln.vulnerability.severity.lower() %}border-uog-burgundy bg-red-50{% elif 'medium' in vuln.vulnerability.severity.lower() %}border-uog-rust bg-orange-50{% else %}border-yellow-400 bg-yellow-50{% endif %} p-6 rounded-r-xl print-avoid-break">
+                    <div class="flex justify-between items-start mb-3">
+                        <h4 class="text-lg font-semibold text-gray-800">{{ vuln.package }} v{{ vuln.version }}</h4>
+                        <span class="inline-block px-3 py-1 rounded-full text-xs font-medium
+                            {% if 'high' in vuln.vulnerability.severity.lower() %}bg-red-100 text-uog-burgundy
+                            {% elif 'medium' in vuln.vulnerability.severity.lower() %}bg-orange-100 text-uog-rust
+                            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                            {{ vuln.vulnerability.severity | upper }}
+                        </span>
+                    </div>
+                    <p class="text-gray-700 mb-2">{{ vuln.vulnerability.summary }}</p>
+                    {% if vuln.vulnerability.id %}
+                        <p class="text-sm text-gray-500">
+                            <span class="font-medium">ID:</span> 
+                            <code class="bg-gray-100 px-2 py-1 rounded text-xs">{{ vuln.vulnerability.id }}</code>
+                        </p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+            <div class="text-4xl mb-4">✅</div>
+            <h3 class="text-xl font-semibold text-uog-leaf mb-2">No Security Vulnerabilities Found</h3>
+            <p class="text-gray-600">All dependencies have been scanned and no known vulnerabilities were detected.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Activity Metrics -->
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-uog-slate mb-6 border-l-4 border-uog-blue pl-4">
+        📈 Recent Activity (Past 30 Days)
+    </h2>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
+            <h3 class="text-xl font-semibold text-uog-slate mb-4 flex items-center">
+                <span class="mr-2">👥</span>
+                Development Activity
+            </h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-600">Commits</span>
+                    <span class="font-semibold text-uog-blue">{{ project.github_commits.past_month.total | default(0) }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-600">Contributors</span>
+                    <span class="font-semibold text-uog-blue">{{ project.github_commits.past_month.unique_authors | default(0) }}</span>
+                </div>
+                {% if project.github_commits.top_contributors %}
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-gray-600 mb-1">Top Contributor</p>
+                        <p class="font-medium text-uog-blue">{{ project.github_commits.top_contributors[0].name }}</p>
+                        <p class="text-xs text-gray-500">{{ project.github_commits.top_contributors[0].commits }} commits</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
+            <h3 class="text-xl font-semibold text-uog-slate mb-4 flex items-center">
+                <span class="mr-2">🎯</span>
+                Issue Management
+            </h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-600">Issues Created</span>
+                    <span class="font-semibold text-uog-blue">{{ project.github_issues.past_month.created | default(0) }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-600">Issues Resolved</span>
+                    <span class="font-semibold text-uog-leaf">{{ project.github_issues.past_month.resolved | default(0) }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-gray-600">Resolution Rate</span>
+                    <span class="font-semibold {% if project.github_issues.resolution_rate >= 80 %}text-uog-leaf{% elif project.github_issues.resolution_rate >= 50 %}text-uog-rust{% else %}text-uog-burgundy{% endif %}">
+                        {{ project.github_issues.resolution_rate | default(0) }}%
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sentry Error Tracking -->
+{% if project.sentry_enabled %}
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-uog-slate mb-6 border-l-4 border-uog-blue pl-4">
+        🔥 Error Tracking (Sentry)
+    </h2>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
+            <h3 class="text-xl font-semibold text-uog-slate mb-4">Error Statistics</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-600">Total Issues</span>
+                    <span class="font-semibold {% if project.sentry_issues.past_month.total > 0 %}text-uog-rust{% else %}text-uog-leaf{% endif %}">
+                        {{ project.sentry_issues.past_month.total | default(0) }}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-600">Resolved Issues</span>
+                    <span class="font-semibold text-uog-leaf">{{ project.sentry_issues.past_month.resolved | default(0) }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-600">Unresolved Issues</span>
+                    <span class="font-semibold {% if project.sentry_issues.past_month.unresolved > 0 %}text-uog-rust{% else %}text-uog-leaf{% endif %}">
+                        {{ project.sentry_issues.past_month.unresolved | default(0) }}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-gray-600">Event Volume</span>
+                    <span class="font-semibold text-uog-blue">{{ project.sentry_issues.events_count | default(0) }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
+            <h3 class="text-xl font-semibold text-uog-slate mb-4">Resolution Metrics</h3>
+            
+            {% if project.sentry_issues.avg_resolution_time.days > 0 %}
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Average Resolution Time</p>
+                    <p class="text-2xl font-bold text-uog-blue">{{ project.sentry_issues.avg_resolution_time.days }} days</p>
+                </div>
+            {% else %}
+                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Average Resolution Time</p>
+                    <p class="text-lg font-medium text-gray-400">N/A</p>
+                </div>
+            {% endif %}
+            
+            {% if project.sentry_projects %}
+                <div>
+                    <p class="font-medium text-gray-700 mb-3">Sentry Projects:</p>
+                    <div class="space-y-2">
+                    {% for sentry_project in project.sentry_projects %}
+                        <div class="flex items-center justify-between bg-gray-100 px-3 py-2 rounded">
+                            <span class="text-gray-700">{{ sentry_project.name }}</span>
+                            {% if sentry_project.platform != 'unknown' %}
+                                <span class="text-xs bg-uog-leaf text-white px-2 py-1 rounded">{{ sentry_project.platform }}</span>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-uog-slate mb-6 border-l-4 border-uog-blue pl-4">
+        🔥 Error Tracking
+    </h2>
+    
+    <div class="bg-orange-50 border border-orange-200 rounded-xl p-6">
+        <div class="flex items-center mb-3">
+            <span class="text-2xl mr-3">⚠️</span>
+            <h3 class="text-lg font-semibold text-uog-rust">Sentry Integration Not Configured</h3>
+        </div>
+        <p class="text-gray-700 mb-2">No matching Sentry projects found for error tracking analysis.</p>
+        <p class="text-sm text-gray-600">To enable error tracking, configure SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG environment variables.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block footer_content %}
+Generated by Code Reporter on {{ generated_at }}
+{% endblock %}
