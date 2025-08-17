@@ -178,208 +178,354 @@
                 <div>
                     <h2 class="text-3xl font-bold mb-3">{{ project.name }}</h2>
                     <div class="flex flex-wrap items-center gap-4 text-sm">
-                        <span class="bg-white/20 px-3 py-1 rounded-full\"><strong>Owner:</strong> {{ project.owner }}</span>
-                        <span class="bg-white/20 px-3 py-1 rounded-full\"><strong>Language:</strong> {{ project.primary_language | title if project.primary_language else 'Unknown' }}</span>
-                    </div>\n                </div>\n                <a href=\"{{ project.url }}\" target=\"_blank\" class=\"inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors\">\n                    <svg class=\"w-4 h-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                        <path d=\"M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z\"/>\n                    </svg>\n                    <span class=\"text-sm font-medium\">View Repository</span>\n                </a>\n            </div>\n        </div>\n    </div>"}, {"old_string": "    <!-- Project Executive Summary -->\n    {% if project.llm_project_summary %}\n    <div class=\"bg-gradient-to-r from-uog-light-slate to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue mb-6 print-avoid-break\">\n        <h3 class=\"text-xl font-bold text-uog-slate mb-4 flex items-center\">\n            <span class=\"mr-3\">\ud83d\udccb</span>\n            Project Summary\n        </h3>\n        <div class=\"prose max-w-none text-gray-700\">\n            {{ project.llm_project_summary | markdown | safe }}\n        </div>\n    </div>\n    {% endif %}", "new_string": "    <!-- Project AI Summary -->\n    {% if project.llm_project_summary %}\n    <div class=\"bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8\">\n        <div class=\"bg-gradient-to-r from-accent-600 to-accent-700 p-6 text-white\">\n            <div class=\"flex items-center space-x-3\">\n                <div class=\"w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center\">\n                    <svg class=\"w-4 h-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                        <path d=\"M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z\"/>\n                    </svg>\n                </div>\n                <h3 class=\"text-xl font-bold\">AI Analysis Summary</h3>\n            </div>\n        </div>\n        <div class=\"p-6\">\n            <div class=\"prose max-w-none text-accent-700 leading-relaxed\">\n                {{ project.llm_project_summary | markdown | safe }}\n            </div>\n        </div>\n    </div>\n    {% endif %}"}, {"old_string": "    <!-- Project Overview -->\n    <div class=\"mb-6\">\n        <h3 class=\"text-2xl font-bold text-uog-slate mb-4 border-l-4 border-uog-blue pl-4\">\n            \ud83d\udcca Project Overview\n        </h3>\n        \n        <div class=\"grid grid-cols-2 md:grid-cols-4 gap-4\">\n            <div class=\"bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break\">\n                <div class=\"text-2xl font-bold text-uog-blue mb-1\">{{ project.github_metadata.stars | default(0) }}</div>\n                <div class=\"text-xs text-gray-600\">Stars</div>\n            </div>\n            <div class=\"bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break\">\n                <div class=\"text-2xl font-bold text-uog-blue mb-1\">{{ project.github_metadata.forks | default(0) }}</div>\n                <div class=\"text-xs text-gray-600\">Forks</div>\n            </div>\n            <div class=\"bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break\">\n                <div class=\"text-2xl font-bold text-uog-blue mb-1\">{{ project.vulnerability_summary.total_dependencies | default(0) }}</div>\n                <div class=\"text-xs text-gray-600\">Dependencies</div>\n            </div>\n            <div class=\"bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break\">\n                <div class=\"text-2xl font-bold {% if project.vulnerability_summary.vulnerable_packages > 0 %}text-uog-burgundy{% else %}text-uog-leaf{% endif %} mb-1\">{{ project.vulnerability_summary.vulnerable_packages | default(0) }}</div>\n                <div class=\"text-xs text-gray-600\">Vulnerabilities</div>\n            </div>\n        </div>\n    </div>", "new_string": "    <!-- Project Quick Metrics -->\n    <div class=\"mb-8\">\n        <div class=\"bg-white rounded-xl shadow-sm border border-slate-200 p-6\">\n            <h3 class=\"text-xl font-semibold text-accent-800 mb-6 flex items-center\">\n                <svg class=\"w-5 h-5 mr-2\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                    <path d=\"M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z\"/>\n                </svg>\n                Project Metrics\n            </h3>\n            \n            <div class=\"grid grid-cols-2 md:grid-cols-4 gap-4\">\n                <div class=\"metric-card bg-primary-50 p-4 rounded-lg text-center border border-primary-200\">\n                    <div class=\"text-2xl font-bold text-primary-700 mb-1\">{{ project.github_metadata.stars | default(0) }}</div>\n                    <div class=\"text-xs text-accent-600 font-medium\">GitHub Stars</div>\n                </div>\n                <div class=\"metric-card bg-accent-50 p-4 rounded-lg text-center border border-accent-200\">\n                    <div class=\"text-2xl font-bold text-accent-700 mb-1\">{{ project.github_metadata.forks | default(0) }}</div>\n                    <div class=\"text-xs text-accent-600 font-medium\">Forks</div>\n                </div>\n                <div class=\"metric-card bg-success-50 p-4 rounded-lg text-center border border-success-200\">\n                    <div class=\"text-2xl font-bold text-success-700 mb-1\">{{ project.vulnerability_summary.total_dependencies | default(0) }}</div>\n                    <div class=\"text-xs text-accent-600 font-medium\">Dependencies</div>\n                </div>\n                <div class=\"metric-card bg-{% if project.vulnerability_summary.vulnerable_packages > 0 %}danger-50{% else %}success-50{% endif %} p-4 rounded-lg text-center border border-{% if project.vulnerability_summary.vulnerable_packages > 0 %}danger-200{% else %}success-200{% endif %}\">\n                    <div class=\"text-2xl font-bold text-{% if project.vulnerability_summary.vulnerable_packages > 0 %}danger-700{% else %}success-700{% endif %} mb-1\">{{ project.vulnerability_summary.vulnerable_packages | default(0) }}</div>\n                    <div class=\"text-xs text-accent-600 font-medium\">{% if project.vulnerability_summary.vulnerable_packages > 0 %}Vulnerabilities{% else %}Secure{% endif %}</div>\n                </div>\n            </div>\n        </div>\n    </div>"}]
+                        <span class="bg-white/20 px-3 py-1 rounded-full"><strong>Owner:</strong> {{ project.owner }}</span>
+                        <span class="bg-white/20 px-3 py-1 rounded-full"><strong>Language:</strong> {{ project.primary_language | title if project.primary_language else 'Unknown' }}</span>
+                    </div>
+                </div>
+                <a href="{{ project.url }}" target="_blank" class="inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    <span class="text-sm font-medium">View Repository</span>
+                </a>
+            </div>
+        </div>
+    </div>
 
-    <!-- Project Executive Summary -->
+    <!-- Project AI Summary -->
     {% if project.llm_project_summary %}
-    <div class="bg-gradient-to-r from-uog-light-slate to-gray-50 p-6 rounded-xl border-l-4 border-uog-blue mb-6 print-avoid-break">
-        <h3 class="text-xl font-bold text-uog-slate mb-4 flex items-center">
-            <span class="mr-3">📋</span>
-            Project Summary
-        </h3>
-        <div class="prose max-w-none text-gray-700">
-            {{ project.llm_project_summary | markdown | safe }}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+        <div class="bg-gradient-to-r from-accent-600 to-accent-700 p-6 text-white">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold">AI Analysis Summary</h3>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="prose max-w-none text-accent-700 leading-relaxed">
+                {{ project.llm_project_summary | markdown | safe }}
+            </div>
         </div>
     </div>
     {% endif %}
 
-    <!-- Project Overview -->
-    <div class="mb-6">
-        <h3 class="text-2xl font-bold text-uog-slate mb-4 border-l-4 border-uog-blue pl-4">
-            📊 Project Overview
-        </h3>
-        
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break">
-                <div class="text-2xl font-bold text-uog-blue mb-1">{{ project.github_metadata.stars | default(0) }}</div>
-                <div class="text-xs text-gray-600">Stars</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break">
-                <div class="text-2xl font-bold text-uog-blue mb-1">{{ project.github_metadata.forks | default(0) }}</div>
-                <div class="text-xs text-gray-600">Forks</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break">
-                <div class="text-2xl font-bold text-uog-blue mb-1">{{ project.vulnerability_summary.total_dependencies | default(0) }}</div>
-                <div class="text-xs text-gray-600">Dependencies</div>
-            </div>
-            <div class="bg-white p-4 rounded-lg text-center border border-gray-200 print-avoid-break">
-                <div class="text-2xl font-bold {% if project.vulnerability_summary.vulnerable_packages > 0 %}text-uog-burgundy{% else %}text-uog-leaf{% endif %} mb-1">{{ project.vulnerability_summary.vulnerable_packages | default(0) }}</div>
-                <div class="text-xs text-gray-600">Vulnerabilities</div>
+    <!-- Project Quick Metrics -->
+    <div class="mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 class="text-lg font-semibold text-accent-800 mb-6 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                </svg>
+                Project Metrics
+            </h3>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="metric-card bg-primary-50 p-4 rounded-lg text-center border border-primary-200">
+                    <div class="text-2xl font-bold text-primary-700 mb-1">{{ project.github_metadata.stars | default(0) }}</div>
+                    <div class="text-xs text-accent-600 font-medium">GitHub Stars</div>
+                </div>
+                <div class="metric-card bg-accent-50 p-4 rounded-lg text-center border border-accent-200">
+                    <div class="text-2xl font-bold text-accent-700 mb-1">{{ project.github_metadata.forks | default(0) }}</div>
+                    <div class="text-xs text-accent-600 font-medium">Forks</div>
+                </div>
+                <div class="metric-card bg-success-50 p-4 rounded-lg text-center border border-success-200">
+                    <div class="text-2xl font-bold text-success-700 mb-1">{{ project.vulnerability_summary.total_dependencies | default(0) }}</div>
+                    <div class="text-xs text-accent-600 font-medium">Dependencies</div>
+                </div>
+                <div class="metric-card bg-{% if project.vulnerability_summary.vulnerable_packages > 0 %}danger-50{% else %}success-50{% endif %} p-4 rounded-lg text-center border border-{% if project.vulnerability_summary.vulnerable_packages > 0 %}danger-200{% else %}success-200{% endif %}">
+                    <div class="text-2xl font-bold text-{% if project.vulnerability_summary.vulnerable_packages > 0 %}danger-700{% else %}success-700{% endif %} mb-1">{{ project.vulnerability_summary.vulnerable_packages | default(0) }}</div>
+                    <div class="text-xs text-accent-600 font-medium">{% if project.vulnerability_summary.vulnerable_packages > 0 %}Vulnerabilities{% else %}Secure{% endif %}</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Technology & Project Details -->\n    <div class=\"mb-8\">\n        <div class=\"grid grid-cols-1 lg:grid-cols-2 gap-6\">\n            <!-- Technology Stack -->\n            <div class=\"bg-white rounded-xl shadow-sm border border-slate-200 p-6\">\n                <h3 class=\"text-lg font-semibold text-accent-800 mb-4 flex items-center\">\n                    <svg class=\"w-5 h-5 mr-2\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                        <path d=\"M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4\"/>\n                    </svg>\n                    Technology Stack\n                </h3>\n                <div class=\"space-y-4\">\n                    <div class=\"flex items-center space-x-3 p-3 bg-primary-50 rounded-lg border border-primary-200\">\n                        <div class=\"w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center\">\n                            <span class=\"text-white text-xs font-bold\">{{ project.primary_language[:2].upper() if project.primary_language else 'UK' }}</span>\n                        </div>\n                        <div class=\"flex-1\">\n                            <p class=\"font-semibold text-primary-800\">{{ project.primary_language | title if project.primary_language else 'Unknown' }}</p>\n                            {% if project.language_details[project.primary_language] and project.language_details[project.primary_language].version %}\n                                <p class=\"text-sm text-accent-600\">Version {{ project.language_details[project.primary_language].version }}</p>\n                            {% endif %}\n                        </div>\n                    </div>\n                    \n                    {% if project.language_details[project.primary_language] and project.language_details[project.primary_language].frameworks %}\n                        <div class=\"space-y-2\">\n                            <p class=\"font-medium text-accent-700 text-sm\">Frameworks & Libraries</p>\n                            {% for framework, info in project.language_details[project.primary_language].frameworks.items() %}\n                                <div class=\"flex items-center justify-between bg-slate-50 px-3 py-2 rounded border border-slate-200\">\n                                    <span class=\"text-accent-700 text-sm\">{{ framework | title }}</span>\n                                    {% if info.version and info.version != 'unknown' %}\n                                        <span class=\"text-xs bg-primary-600 text-white px-2 py-1 rounded-full\">v{{ info.version }}</span>\n                                    {% endif %}\n                                </div>\n                            {% endfor %}\n                        </div>\n                    {% endif %}\n                </div>\n            </div>\n            \n            <!-- Project Information -->\n            <div class=\"bg-white rounded-xl shadow-sm border border-slate-200 p-6\">\n                <h3 class=\"text-lg font-semibold text-accent-800 mb-4 flex items-center\">\n                    <svg class=\"w-5 h-5 mr-2\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                        <path d=\"M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z\"/>\n                    </svg>\n                    Project Information\n                </h3>\n                <div class=\"space-y-3\">\n                    {% if project.github_metadata.license %}\n                        <div class=\"flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200\">\n                            <span class=\"font-medium text-accent-700 text-sm\">License</span>\n                            <span class=\"inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800\">\n                                {{ project.github_metadata.license }}\n                            </span>\n                        </div>\n                    {% endif %}\n                    {% if project.github_metadata.description %}\n                        <div class=\"p-3 bg-slate-50 rounded-lg border border-slate-200\">\n                            <p class=\"font-medium text-accent-700 mb-1 text-sm\">Description</p>\n                            <p class=\"text-accent-600 text-xs leading-relaxed\">{{ project.github_metadata.description }}</p>\n                        </div>\n                    {% endif %}\n                    {% if project.github_metadata.created_at %}\n                        <div class=\"flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200\">\n                            <span class=\"font-medium text-accent-700 text-sm\">Created</span>\n                            <span class=\"text-accent-600 text-xs\">{{ project.github_metadata.created_at }}</span>\n                        </div>\n                    {% endif %}\n                    {% if project.github_metadata.updated_at %}\n                        <div class=\"flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200\">\n                            <span class=\"font-medium text-accent-700 text-sm\">Last Updated</span>\n                            <span class=\"text-accent-600 text-xs\">{{ project.github_metadata.updated_at }}</span>\n                        </div>\n                    {% endif %}\n                </div>\n            </div>\n        </div>\n    </div>"}, {"old_string": "    <!-- Security Analysis -->\n    <div class=\"mb-6\">\n        <h3 class=\"text-2xl font-bold text-uog-slate mb-4 border-l-4 border-uog-blue pl-4\">\n            \ud83d\udee1\ufe0f Security Analysis\n        </h3>\n        \n        {% if project.vulnerabilities %}\n            <div class=\"space-y-3\">\n                {% for vuln in project.vulnerabilities[:5] %}\n                    <div class=\"bg-white border-l-4 {% if vuln.vulnerability.severity == 'high' %}border-uog-burgundy bg-red-50{% elif vuln.vulnerability.severity == 'medium' %}border-uog-rust bg-orange-50{% else %}border-yellow-400 bg-yellow-50{% endif %} p-4 rounded-r-xl print-avoid-break\">\n                        <div class=\"flex justify-between items-start mb-2\">\n                            <h5 class=\"font-semibold text-gray-800\">{{ vuln.package }} v{{ vuln.version }}</h5>\n                            <span class=\"inline-block px-2 py-1 rounded-full text-xs font-medium\n                                {% if vuln.vulnerability.severity == 'high' %}bg-red-100 text-uog-burgundy\n                                {% elif vuln.vulnerability.severity == 'medium' %}bg-orange-100 text-uog-rust\n                                {% else %}bg-yellow-100 text-yellow-700{% endif %}\">\n                                {{ vuln.vulnerability.severity | upper }}\n                            </span>\n                        </div>\n                        <p class=\"text-gray-700 text-sm\">{{ vuln.vulnerability.summary }}</p>\n                    </div>\n                {% endfor %}\n                {% if project.vulnerabilities|length > 5 %}\n                    <p class=\"text-sm text-gray-500 italic text-center py-2\">... and {{ project.vulnerabilities|length - 5 }} more vulnerabilities</p>\n                {% endif %}\n            </div>\n        {% else %}\n            <div class=\"bg-green-50 border border-green-200 rounded-xl p-6 text-center\">\n                <div class=\"text-2xl mb-2\">✅</div>\n                <p class=\"font-semibold text-uog-leaf\">No known security vulnerabilities found</p>\n            </div>\n        {% endif %}\n    </div>", "new_string": "    <!-- Security Assessment -->\n    <div class=\"mb-8\">\n        <div class=\"bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden\">\n            <div class=\"bg-gradient-to-r from-{% if project.vulnerabilities %}danger-600 to-danger-700{% else %}success-600 to-success-700{% endif %} p-6 text-white\">\n                <div class=\"flex items-center space-x-3\">\n                    <div class=\"w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center\">\n                        <svg class=\"w-4 h-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                            {% if project.vulnerabilities %}\n                            <path d=\"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z\"/>\n                            {% else %}\n                            <path d=\"M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 7.04A12.02 12.02 0 003 9c0-5.591 3.824-10.29 9-11.622 5.176 1.332 9 6.03 9 11.622 0 1.042-.133 2.052-.382 3.016z\"/>\n                            {% endif %}\n                        </svg>\n                    </div>\n                    <h3 class=\"text-lg font-bold\">Security Status</h3>\n                </div>\n            </div>\n            <div class=\"p-6\">\n                {% if project.vulnerabilities %}\n                    <div class=\"space-y-4\">\n                        {% for vuln in project.vulnerabilities[:5] %}\n                            <div class=\"bg-{% if vuln.vulnerability.severity.lower() == 'high' %}danger-50 border-danger-200{% elif vuln.vulnerability.severity.lower() == 'medium' %}warning-50 border-warning-200{% else %}yellow-50 border-yellow-200{% endif %} border rounded-lg p-4\">\n                                <div class=\"flex justify-between items-start mb-2\">\n                                    <h4 class=\"font-semibold text-accent-800\">{{ vuln.package }}</h4>\n                                    <span class=\"inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-{% if vuln.vulnerability.severity.lower() == 'high' %}danger-100 text-danger-800{% elif vuln.vulnerability.severity.lower() == 'medium' %}warning-100 text-warning-800{% else %}yellow-100 text-yellow-800{% endif %}\">\n                                        {{ vuln.vulnerability.severity | upper }}\n                                    </span>\n                                </div>\n                                <p class=\"text-accent-600 text-sm mb-2\">Version {{ vuln.version }}</p>\n                                <p class=\"text-accent-700 text-sm leading-relaxed\">{{ vuln.vulnerability.summary }}</p>\n                            </div>\n                        {% endfor %}\n                        {% if project.vulnerabilities|length > 5 %}\n                            <div class=\"text-center p-4 bg-slate-50 rounded-lg border border-slate-200\">\n                                <p class=\"text-sm text-accent-500 font-medium\">+ {{ project.vulnerabilities|length - 5 }} additional vulnerabilities</p>\n                                <p class=\"text-xs text-accent-400\">See detailed project report for complete analysis</p>\n                            </div>\n                        {% endif %}\n                    </div>\n                {% else %}\n                    <div class=\"text-center py-8\">\n                        <div class=\"w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4\">\n                            <svg class=\"w-8 h-8 text-success-600\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                                <path d=\"M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 7.04A12.02 12.02 0 003 9c0-5.591 3.824-10.29 9-11.622 5.176 1.332 9 6.03 9 11.622 0 1.042-.133 2.052-.382 3.016z\"/>\n                            </svg>\n                        </div>\n                        <p class=\"font-semibold text-success-800 mb-2\">Security Status: Clean</p>\n                        <p class=\"text-accent-600 text-sm\">No known security vulnerabilities detected</p>\n                    </div>\n                {% endif %}\n            </div>\n        </div>\n    </div>"}]
-
-    <!-- Recent Activity -->
-    <div class="mb-6">
-        <h3 class="text-2xl font-bold text-uog-slate mb-4 border-l-4 border-uog-blue pl-4">
-            📈 Recent Activity (Past 30 Days)
-        </h3>
-        
+    <!-- Technology & Project Details -->
+    <div class="mb-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
-                <h4 class="text-lg font-semibold text-uog-slate mb-4 flex items-center">
-                    <span class="mr-2">👥</span>
-                    Development Activity
-                </h4>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Commits</span>
-                        <span class="font-semibold text-uog-blue">{{ project.github_commits.past_month.total | default(0) }}</span>
+            <!-- Technology Stack -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h3 class="text-lg font-semibold text-accent-800 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                    </svg>
+                    Technology Stack
+                </h3>
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-3 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                        <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white text-xs font-bold">{{ project.primary_language[:2].upper() if project.primary_language else 'UK' }}</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-primary-800">{{ project.primary_language | title if project.primary_language else 'Unknown' }}</p>
+                            {% if project.language_details[project.primary_language] and project.language_details[project.primary_language].version %}
+                                <p class="text-sm text-accent-600">Version {{ project.language_details[project.primary_language].version }}</p>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Contributors</span>
-                        <span class="font-semibold text-uog-blue">{{ project.github_commits.past_month.unique_authors | default(0) }}</span>
-                    </div>
-                    {% if project.github_commits.top_contributors %}
-                        <div class="mt-3 p-3 bg-blue-50 rounded-lg">
-                            <p class="text-sm text-gray-600 mb-1">Top Contributor</p>
-                            <p class="font-medium text-uog-blue">{{ project.github_commits.top_contributors[0].name }}</p>
-                            <p class="text-xs text-gray-500">{{ project.github_commits.top_contributors[0].commits }} commits</p>
+                    
+                    {% if project.language_details[project.primary_language] and project.language_details[project.primary_language].frameworks %}
+                        <div class="space-y-2">
+                            <p class="font-medium text-accent-700 text-sm">Frameworks & Libraries</p>
+                            {% for framework, info in project.language_details[project.primary_language].frameworks.items() %}
+                                <div class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded border border-slate-200">
+                                    <span class="text-accent-700 text-sm">{{ framework | title }}</span>
+                                    {% if info.version and info.version != 'unknown' %}
+                                        <span class="text-xs bg-primary-600 text-white px-2 py-1 rounded-full">v{{ info.version }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
                         </div>
                     {% endif %}
                 </div>
             </div>
             
-            <div class="bg-white p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
-                <h4 class="text-lg font-semibold text-uog-slate mb-4 flex items-center">
-                    <span class="mr-2">🎯</span>
-                    Issue Management
-                </h4>
+            <!-- Project Information -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h3 class="text-lg font-semibold text-accent-800 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Project Information
+                </h3>
                 <div class="space-y-3">
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Issues Created</span>
-                        <span class="font-semibold text-uog-blue">{{ project.github_issues.past_month.created | default(0) }}</span>
+                    {% if project.github_metadata.license %}
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="font-medium text-accent-700 text-sm">License</span>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
+                                {{ project.github_metadata.license }}
+                            </span>
+                        </div>
+                    {% endif %}
+                    {% if project.github_metadata.description %}
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <p class="font-medium text-accent-700 mb-1 text-sm">Description</p>
+                            <p class="text-accent-600 text-xs leading-relaxed">{{ project.github_metadata.description }}</p>
+                        </div>
+                    {% endif %}
+                    {% if project.github_metadata.created_at %}
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="font-medium text-accent-700 text-sm">Created</span>
+                            <span class="text-accent-600 text-xs">{{ project.github_metadata.created_at }}</span>
+                        </div>
+                    {% endif %}
+                    {% if project.github_metadata.updated_at %}
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="font-medium text-accent-700 text-sm">Last Updated</span>
+                            <span class="text-accent-600 text-xs">{{ project.github_metadata.updated_at }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-6 text-white">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 14l9-5-9-5-9 5 9 5z"/>
+                            <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+                        </svg>
                     </div>
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Issues Resolved</span>
-                        <span class="font-semibold text-uog-leaf">{{ project.github_issues.past_month.resolved | default(0) }}</span>
+                    <h3 class="text-lg font-bold">Recent Activity (Past 30 Days)</h3>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-semibold text-accent-800 mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            Development Activity
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Commits</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">{{ project.github_commits.past_month.total | default(0) }}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Contributors</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent-100 text-accent-800">{{ project.github_commits.past_month.unique_authors | default(0) }}</span>
+                            </div>
+                            {% if project.github_commits.top_contributors %}
+                                <div class="p-3 bg-primary-50 rounded-lg border border-primary-200">
+                                    <p class="font-medium text-primary-700 mb-1 text-sm">Top Contributor</p>
+                                    <p class="text-primary-800 font-semibold">{{ project.github_commits.top_contributors[0].name }}</p>
+                                    <p class="text-xs text-primary-600">{{ project.github_commits.top_contributors[0].commits }} commits</p>
+                                </div>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="flex justify-between items-center py-2">
-                        <span class="text-gray-600">Resolution Rate</span>
-                        <span class="font-semibold {% if project.github_issues.resolution_rate >= 80 %}text-uog-leaf{% elif project.github_issues.resolution_rate >= 50 %}text-uog-rust{% else %}text-uog-burgundy{% endif %}">
-                            {{ project.github_issues.resolution_rate | default(0) }}%
-                        </span>
+                    
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-semibold text-accent-800 mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/>
+                            </svg>
+                            Issue Management
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Issues Created</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent-100 text-accent-800">{{ project.github_issues.past_month.created | default(0) }}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Issues Resolved</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">{{ project.github_issues.past_month.resolved | default(0) }}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Resolution Rate</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-{% if project.github_issues.resolution_rate >= 80 %}success-100 text-success-800{% elif project.github_issues.resolution_rate >= 50 %}warning-100 text-warning-800{% else %}danger-100 text-danger-800{% endif %}">
+                                    {{ project.github_issues.resolution_rate | default(0) }}%
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Assessment -->
+    <div class="mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-gradient-to-r from-{% if project.vulnerabilities %}danger-600 to-danger-700{% else %}success-600 to-success-700{% endif %} p-6 text-white">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            {% if project.vulnerabilities %}
+                            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            {% else %}
+                            <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 7.04A12.02 12.02 0 003 9c0-5.591 3.824-10.29 9-11.622 5.176 1.332 9 6.03 9 11.622 0 1.042-.133 2.052-.382 3.016z"/>
+                            {% endif %}
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold">Security Status</h3>
+                </div>
+            </div>
+            <div class="p-6">
+                {% if project.vulnerabilities %}
+                    <div class="space-y-4">
+                        {% for vuln in project.vulnerabilities[:5] %}
+                            <div class="bg-{% if vuln.vulnerability.severity.lower() == 'high' %}danger-50 border-danger-200{% elif vuln.vulnerability.severity.lower() == 'medium' %}warning-50 border-warning-200{% else %}yellow-50 border-yellow-200{% endif %} border rounded-lg p-4">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="font-semibold text-accent-800">{{ vuln.package }}</h4>
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-{% if vuln.vulnerability.severity.lower() == 'high' %}danger-100 text-danger-800{% elif vuln.vulnerability.severity.lower() == 'medium' %}warning-100 text-warning-800{% else %}yellow-100 text-yellow-800{% endif %}">
+                                        {{ vuln.vulnerability.severity | upper }}
+                                    </span>
+                                </div>
+                                <p class="text-accent-600 text-sm mb-2">Version {{ vuln.version }}</p>
+                                <p class="text-accent-700 text-sm leading-relaxed">{{ vuln.vulnerability.summary }}</p>
+                            </div>
+                        {% endfor %}
+                        {% if project.vulnerabilities|length > 5 %}
+                            <div class="text-center p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <p class="text-sm text-accent-500 font-medium">+ {{ project.vulnerabilities|length - 5 }} additional vulnerabilities</p>
+                                <p class="text-xs text-accent-400">See detailed project report for complete analysis</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-8">
+                        <div class="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-success-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 7.04A12.02 12.02 0 003 9c0-5.591 3.824-10.29 9-11.622 5.176 1.332 9 6.03 9 11.622 0 1.042-.133 2.052-.382 3.016z"/>
+                            </svg>
+                        </div>
+                        <p class="font-semibold text-success-800 mb-2">Security Status: Clean</p>
+                        <p class="text-accent-600 text-sm">No known security vulnerabilities detected</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
     <!-- Sentry Error Tracking -->
     {% if project.sentry_enabled %}
-    <div class="mb-6">
-        <h3 class="text-2xl font-bold text-uog-slate mb-4 border-l-4 border-uog-blue pl-4">
-            🔥 Error Tracking (Sentry)
-        </h3>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
-                <h4 class="text-lg font-semibold text-uog-slate mb-4">Error Statistics</h4>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Total Issues</span>
-                        <span class="font-semibold {% if project.sentry_issues.past_month.total > 0 %}text-uog-rust{% else %}text-uog-leaf{% endif %}">
-                            {{ project.sentry_issues.past_month.total | default(0) }}
-                        </span>
+    <div class="mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-gradient-to-r from-warning-600 to-warning-700 p-6 text-white">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
                     </div>
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Resolved Issues</span>
-                        <span class="font-semibold text-uog-leaf">{{ project.sentry_issues.past_month.resolved | default(0) }}</span>
-                    </div>
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200">
-                        <span class="text-gray-600">Unresolved Issues</span>
-                        <span class="font-semibold {% if project.sentry_issues.past_month.unresolved > 0 %}text-uog-rust{% else %}text-uog-leaf{% endif %}">
-                            {{ project.sentry_issues.past_month.unresolved | default(0) }}
-                        </span>
-                    </div>
-                    <div class="flex justify-between items-center py-2">
-                        <span class="text-gray-600">Event Volume</span>
-                        <span class="font-semibold text-uog-blue">{{ project.sentry_issues.events_count | default(0) }}</span>
-                    </div>
+                    <h3 class="text-lg font-bold">Error Tracking (Sentry)</h3>
                 </div>
             </div>
-            
-            <div class="bg-white p-6 rounded-xl border-l-4 border-uog-blue print-avoid-break">
-                <h4 class="text-lg font-semibold text-uog-slate mb-4">Resolution Metrics</h4>
-                {% if project.sentry_issues.avg_resolution_time.days > 0 %}
-                    <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-                        <p class="text-sm text-gray-600 mb-1">Average Resolution Time</p>
-                        <p class="text-2xl font-bold text-uog-blue">{{ project.sentry_issues.avg_resolution_time.days }} days</p>
-                    </div>
-                {% else %}
-                    <div class="mb-4 p-4 bg-gray-50 rounded-lg">
-                        <p class="text-sm text-gray-600 mb-1">Average Resolution Time</p>
-                        <p class="text-lg font-medium text-gray-400">N/A</p>
-                    </div>
-                {% endif %}
-                
-                {% if project.sentry_projects %}
-                    <div>
-                        <p class="font-medium text-gray-700 mb-3">Sentry Projects:</p>
-                        <div class="space-y-2">
-                        {% for sentry_project in project.sentry_projects %}
-                            <div class="flex items-center justify-between bg-gray-100 px-3 py-2 rounded">
-                                <span class="text-gray-700 text-sm">{{ sentry_project.name }}</span>
-                                {% if sentry_project.platform != 'unknown' %}
-                                    <span class="text-xs bg-uog-leaf text-white px-2 py-1 rounded">{{ sentry_project.platform }}</span>
-                                {% endif %}
+            <div class="p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-semibold text-accent-800 mb-4">Error Statistics</h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Total Issues</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-{% if project.sentry_issues.past_month.total > 0 %}warning-100 text-warning-800{% else %}success-100 text-success-800{% endif %}">
+                                    {{ project.sentry_issues.past_month.total | default(0) }}
+                                </span>
                             </div>
-                        {% endfor %}
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Resolved Issues</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">{{ project.sentry_issues.past_month.resolved | default(0) }}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Unresolved Issues</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-{% if project.sentry_issues.past_month.unresolved > 0 %}danger-100 text-danger-800{% else %}success-100 text-success-800{% endif %}">
+                                    {{ project.sentry_issues.past_month.unresolved | default(0) }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <span class="font-medium text-accent-700 text-sm">Event Volume</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent-100 text-accent-800">{{ project.sentry_issues.events_count | default(0) }}</span>
+                            </div>
                         </div>
                     </div>
-                {% endif %}
+                    
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-semibold text-accent-800 mb-4">Resolution Metrics</h4>
+                        {% if project.sentry_issues.avg_resolution_time.days > 0 %}
+                            <div class="p-4 bg-primary-50 rounded-lg border border-primary-200">
+                                <p class="font-medium text-primary-700 mb-1 text-sm">Average Resolution Time</p>
+                                <p class="text-2xl font-bold text-primary-800">{{ project.sentry_issues.avg_resolution_time.days }} days</p>
+                            </div>
+                        {% else %}
+                            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <p class="font-medium text-accent-700 mb-1 text-sm">Average Resolution Time</p>
+                                <p class="text-lg font-medium text-accent-400">Not Available</p>
+                            </div>
+                        {% endif %}
+                        
+                        {% if project.sentry_projects %}
+                            <div>
+                                <p class="font-medium text-accent-700 mb-3 text-sm">Sentry Projects</p>
+                                <div class="space-y-2">
+                                {% for sentry_project in project.sentry_projects %}
+                                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                        <span class="text-accent-700 text-sm font-medium">{{ sentry_project.name }}</span>
+                                        {% if sentry_project.platform != 'unknown' %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent-100 text-accent-800">{{ sentry_project.platform }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     {% endif %}
-
-    <!-- Security Analysis -->
-    <div class="mb-6">
-        <h3 class="text-2xl font-bold text-uog-slate mb-4 border-l-4 border-uog-blue pl-4">
-            🛡️ Security Analysis
-        </h3>
-        
-        {% if project.vulnerabilities %}
-            <div class="space-y-3">
-                {% for vuln in project.vulnerabilities[:5] %}
-                    <div class="bg-white border-l-4 {% if vuln.vulnerability.severity == 'high' %}border-uog-burgundy bg-red-50{% elif vuln.vulnerability.severity == 'medium' %}border-uog-rust bg-orange-50{% else %}border-yellow-400 bg-yellow-50{% endif %} p-4 rounded-r-xl print-avoid-break">
-                        <div class="flex justify-between items-start mb-2">
-                            <h5 class="font-semibold text-gray-800">{{ vuln.package }} v{{ vuln.version }}</h5>
-                            <span class="inline-block px-2 py-1 rounded-full text-xs font-medium
-                                {% if vuln.vulnerability.severity == 'high' %}bg-red-100 text-uog-burgundy
-                                {% elif vuln.vulnerability.severity == 'medium' %}bg-orange-100 text-uog-rust
-                                {% else %}bg-yellow-100 text-yellow-700{% endif %}">
-                                {{ vuln.vulnerability.severity | upper }}
-                            </span>
-                        </div>
-                        <p class="text-gray-700 text-sm">{{ vuln.vulnerability.summary }}</p>
-                    </div>
-                {% endfor %}
-                {% if project.vulnerabilities|length > 5 %}
-                    <p class="text-sm text-gray-500 italic text-center py-2">... and {{ project.vulnerabilities|length - 5 }} more vulnerabilities</p>
-                {% endif %}
-            </div>
-        {% else %}
-            <div class="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-                <div class="text-2xl mb-2">✅</div>
-                <p class="font-semibold text-uog-leaf">No known security vulnerabilities found</p>
-            </div>
-        {% endif %}
-    </div>
 
     <!-- Section Navigation -->
     <div class="text-center mt-12 mb-8 no-print">
@@ -399,7 +545,7 @@
             </a>
             {% endif %}
         </div>
-    </div>"}]
+    </div>
 </div>
 {% endif %}
 {% endfor %}
