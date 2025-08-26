@@ -512,7 +512,8 @@ class ReportGenerator:
         template_data = {
             'summary': summary,
             'charts': charts,
-            'projects': enhanced_projects,  # Use enhanced projects with template variables
+            'projects': enhanced_projects,  # Dictionary for individual project sections
+            'projects_list': list(enhanced_projects.values()),  # List for executive summary section
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'llm_summary': processed_data.get('llm_summary'),
             'risk_metrics': {
