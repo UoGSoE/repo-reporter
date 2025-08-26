@@ -331,21 +331,23 @@
                         </div>
                         <div class="flex justify-between items-center py-3">
                             <span class="text-slate-600 font-medium">Resolution Rate</span>
-                            <span class="text-2xl font-bold {% if project.github_issues.resolution_rate >= 80 %}text-success-600{% elif project.github_issues.resolution_rate >= 50 %}text-warning-600{% else %}text-danger-600{% endif %}">
+                            <span class="text-2xl font-bold {% if (project.github_issues.past_month.created | default(0)) == 0 and (project.github_issues.past_month.resolved | default(0)) == 0 %}text-slate-600{% elif project.github_issues.resolution_rate >= 80 %}text-success-600{% elif project.github_issues.resolution_rate >= 50 %}text-warning-600{% else %}text-danger-600{% endif %}">
                                 {{ project.github_issues.resolution_rate | default(0) }}%
                             </span>
                         </div>
                         
                         {% set resolution_rate = project.github_issues.resolution_rate | default(0) %}
+                        {% set issues_created = project.github_issues.past_month.created | default(0) %}
+                        {% set issues_resolved = project.github_issues.past_month.resolved | default(0) %}
                         <div class="mt-4 p-4 bg-white rounded-lg border border-slate-200">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-sm font-medium text-slate-600">Performance Status</span>
-                                <span class="px-2 py-1 rounded-full text-xs font-bold {% if resolution_rate >= 80 %}bg-success-100 text-success-700{% elif resolution_rate >= 50 %}bg-warning-100 text-warning-700{% else %}bg-danger-100 text-danger-700{% endif %}">
-                                    {% if resolution_rate >= 80 %}EXCELLENT{% elif resolution_rate >= 50 %}GOOD{% else %}NEEDS ATTENTION{% endif %}
+                                <span class="px-2 py-1 rounded-full text-xs font-bold {% if issues_created == 0 and issues_resolved == 0 %}bg-slate-100 text-slate-700{% elif resolution_rate >= 80 %}bg-success-100 text-success-700{% elif resolution_rate >= 50 %}bg-warning-100 text-warning-700{% else %}bg-danger-100 text-danger-700{% endif %}">
+                                    {% if issues_created == 0 and issues_resolved == 0 %}NO ISSUES{% elif resolution_rate >= 80 %}EXCELLENT{% elif resolution_rate >= 50 %}GOOD{% else %}NEEDS ATTENTION{% endif %}
                                 </span>
                             </div>
                             <div class="w-full bg-slate-200 rounded-full h-2">
-                                <div class="h-2 rounded-full {% if resolution_rate >= 80 %}bg-success-500{% elif resolution_rate >= 50 %}bg-warning-500{% else %}bg-danger-500{% endif %}" style="width: {{ resolution_rate }}%"></div>
+                                <div class="h-2 rounded-full {% if issues_created == 0 and issues_resolved == 0 %}bg-slate-400{% elif resolution_rate >= 80 %}bg-success-500{% elif resolution_rate >= 50 %}bg-warning-500{% else %}bg-danger-500{% endif %}" style="width: {% if issues_created == 0 and issues_resolved == 0 %}100{% else %}{{ resolution_rate }}{% endif %}%"></div>
                             </div>
                         </div>
                     </div>
