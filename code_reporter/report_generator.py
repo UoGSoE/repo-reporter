@@ -320,14 +320,20 @@ class ReportGenerator:
                 'count': exec_chart_values
             })
             
-            # Use graph_objects for explicit control over data types
-            fig_dep_licenses = go.Figure(data=[go.Pie(
-                labels=exec_chart_names,
-                values=exec_chart_values,
-                textinfo='label+percent',
-                hovertemplate='<b>%{label}</b><br>Dependencies: %{value}<br>Percentage: %{percent}<extra></extra>'
+            # Use graph_objects for vertical bar chart - more natural layout than horizontal
+            fig_dep_licenses = go.Figure(data=[go.Bar(
+                x=exec_chart_names,
+                y=exec_chart_values,
+                hovertemplate='<b>%{x}</b><br>Dependencies: %{y}<extra></extra>',
+                marker_color='#3B82F6'
             )])
-            fig_dep_licenses.update_layout(title_text="Dependency License Distribution")
+            fig_dep_licenses.update_layout(
+                title_text="Dependency License Distribution",
+                xaxis_title="License Type",
+                yaxis_title="Number of Dependencies",
+                height=400,
+                xaxis={'tickangle': 45}  # Angle the license names for better readability
+            )
             charts['dependency_license_distribution'] = fig_dep_licenses.to_html(include_plotlyjs=False, div_id="dep-license-chart")
         
         # Security overview chart
