@@ -358,15 +358,15 @@
         <div class="p-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {% for project in projects_list | default(projects) %}
-                <div class="card-hover bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print-avoid-break">
+                <a href="#project-{{ loop.index }}" class="card-hover bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print-avoid-break hover:shadow-lg hover:border-primary-300 transition-all duration-200 cursor-pointer group" aria-label="Go to {{ project.name }} detailed report">
                     <div class="p-6">
                         <!-- Project Header -->
                         <div class="flex items-start justify-between mb-4">
                             <div class="flex-1">
-                                <h3 class="text-lg font-semibold text-accent-800 mb-1">{{ project.name }}</h3>
+                                <h3 class="text-lg font-semibold text-accent-800 mb-1 group-hover:text-primary-700 transition-colors">{{ project.name }}</h3>
                                 <p class="text-sm text-accent-500">{{ project.primary_language | title if project.primary_language else 'Multi-language' }}</p>
                             </div>
-                            <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                            <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center group-hover:bg-primary-200 transition-colors">
                                 <svg class="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                                 </svg>
@@ -418,7 +418,7 @@
                             {% endif %}
                         </div>
                     </div>
-                </div>
+                </a>
                 {% endfor %}
             </div>
         </div>
