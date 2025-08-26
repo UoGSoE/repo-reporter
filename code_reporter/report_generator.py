@@ -390,26 +390,74 @@ class ReportGenerator:
             fig_activity = make_subplots(
                 rows=1, cols=2, 
                 subplot_titles=('Issue Management (Past 30 Days)', 'Average Resolution Time (Days)'),
-                specs=[[{"secondary_y": False}, {"secondary_y": False}]]
+                specs=[[{"secondary_y": False}, {"secondary_y": False}]],
+                horizontal_spacing=0.15
             )
             
             # Issues created vs resolved
             fig_activity.add_trace(
-                go.Bar(x=project_names, y=issues_created, name="Issues Created", marker_color='lightblue'),
+                go.Bar(
+                    x=project_names, 
+                    y=issues_created, 
+                    name="Issues Created", 
+                    marker_color='#60A5FA',
+                    hovertemplate='<b>%{x}</b><br>Issues Created: %{y}<extra></extra>'
+                ),
                 row=1, col=1
             )
             fig_activity.add_trace(
-                go.Bar(x=project_names, y=issues_resolved, name="Issues Resolved", marker_color='green'),
+                go.Bar(
+                    x=project_names, 
+                    y=issues_resolved, 
+                    name="Issues Resolved", 
+                    marker_color='#10B981',
+                    hovertemplate='<b>%{x}</b><br>Issues Resolved: %{y}<extra></extra>'
+                ),
                 row=1, col=1
             )
             
             # Average resolution time
             fig_activity.add_trace(
-                go.Bar(x=project_names, y=avg_resolution_days, name="Avg Resolution Time", marker_color='orange'),
+                go.Bar(
+                    x=project_names, 
+                    y=avg_resolution_days, 
+                    name="Avg Resolution Time", 
+                    marker_color='#F59E0B',
+                    hovertemplate='<b>%{x}</b><br>Resolution Time: %{y} days<extra></extra>',
+                    showlegend=False
+                ),
                 row=1, col=2
             )
             
-            fig_activity.update_layout(title_text="Issue Resolution Metrics")
+            # Update layout with proper y-axis ranges and formatting
+            fig_activity.update_layout(
+                title_text="Issue Resolution Metrics",
+                height=450,
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                )
+            )
+            
+            # Set y-axis ranges to start from 0 and add some padding at the top
+            max_issues = max(max(issues_created + issues_resolved, default=0), 1)
+            max_resolution = max(max(avg_resolution_days, default=0), 1)
+            
+            fig_activity.update_yaxes(
+                range=[0, max_issues * 1.1], 
+                row=1, col=1,
+                title_text="Number of Issues"
+            )
+            fig_activity.update_yaxes(
+                range=[0, max_resolution * 1.1], 
+                row=1, col=2,
+                title_text="Days"
+            )
+            
             charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs=False, div_id="activity-chart")
         
         return charts
