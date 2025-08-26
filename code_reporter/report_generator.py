@@ -302,13 +302,43 @@ class ReportGenerator:
             )
             charts['language_distribution'] = fig_lang.to_html(include_plotlyjs=False, div_id="lang-chart")
         
-        # Dependency license distribution pie chart (executive summary)
+        # Dependency license distribution bar chart (executive summary)
         if summary['dependency_license_distribution']:
             logger = get_logger()
             logger.debug(f"Executive summary chart data: {summary['dependency_license_distribution']}")
+            
+            # Simplify license names for executive summary
+            def simplify_license_name(license_name):
+                """Simplify license names for executive-friendly display"""
+                license_lower = license_name.lower()
+                if 'mit' in license_lower:
+                    return 'MIT'
+                elif 'apache' in license_lower:
+                    return 'Apache'
+                elif 'bsd' in license_lower and 'gpl' in license_lower:
+                    return 'Mixed'
+                elif 'bsd' in license_lower:
+                    return 'BSD'
+                elif 'gpl' in license_lower:
+                    return 'GPL'
+                elif 'lgpl' in license_lower:
+                    return 'LGPL'
+                elif 'mozilla' in license_lower or 'mpl' in license_lower:
+                    return 'Mozilla'
+                elif 'unlicense' in license_lower:
+                    return 'Public Domain'
+                else:
+                    return 'Other'
+            
+            # Group licenses by simplified names and aggregate counts
+            simplified_licenses = {}
+            for license_name, count in summary['dependency_license_distribution'].items():
+                simplified_name = simplify_license_name(license_name)
+                simplified_licenses[simplified_name] = simplified_licenses.get(simplified_name, 0) + count
+            
             # Ensure values are proper native Python integers for Plotly
-            exec_chart_values = [int(v) if v is not None else 0 for v in summary['dependency_license_distribution'].values()]
-            exec_chart_names = list(summary['dependency_license_distribution'].keys())
+            exec_chart_values = [int(v) if v is not None else 0 for v in simplified_licenses.values()]
+            exec_chart_names = list(simplified_licenses.keys())
             # Force to native Python types to avoid numpy encoding issues
             exec_chart_values = [int(x) for x in exec_chart_values]
             logger.debug(f"Executive chart values: {exec_chart_values}, names: {exec_chart_names}")
