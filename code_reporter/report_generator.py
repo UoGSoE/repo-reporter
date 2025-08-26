@@ -379,88 +379,152 @@ class ReportGenerator:
         fig_security.update_layout(title="Security Overview")
         charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
         
-        # Issue resolution metrics chart
+        # Development Activity Dashboard
         projects = list(processed_data['projects'].values())
         if projects:
-            project_names = [p['name'] for p in projects]
-            issues_created = [p.get('github_issues', {}).get('past_month', {}).get('created', 0) for p in projects]
-            issues_resolved = [p.get('github_issues', {}).get('past_month', {}).get('resolved', 0) for p in projects]
-            avg_resolution_days = [p.get('github_issues', {}).get('avg_resolution_time', {}).get('days', 0) for p in projects]
+            # Calculate activity scores for each project
+            activity_data = []
+            for project in projects:
+                activity_score, breakdown = self._calculate_activity_score(project)
+                activity_data.append({
+                    'name': project['name'],
+                    'score': activity_score,
+                    'breakdown': breakdown
+                })
             
-            fig_activity = make_subplots(
-                rows=1, cols=2, 
-                subplot_titles=('Issue Management (Past 30 Days)', 'Average Resolution Time (Days)'),
-                specs=[[{"secondary_y": False}, {"secondary_y": False}]],
-                horizontal_spacing=0.15
-            )
+            # Sort by activity score (highest first)
+            activity_data.sort(key=lambda x: x['score'], reverse=True)
             
-            # Issues created vs resolved
-            fig_activity.add_trace(
-                go.Bar(
-                    x=project_names, 
-                    y=issues_created, 
-                    name="Issues Created", 
-                    marker_color='#60A5FA',
-                    hovertemplate='<b>%{x}</b><br>Issues Created: %{y}<extra></extra>'
-                ),
-                row=1, col=1
-            )
-            fig_activity.add_trace(
-                go.Bar(
-                    x=project_names, 
-                    y=issues_resolved, 
-                    name="Issues Resolved", 
-                    marker_color='#10B981',
-                    hovertemplate='<b>%{x}</b><br>Issues Resolved: %{y}<extra></extra>'
-                ),
-                row=1, col=1
-            )
+            project_names = [item['name'] for item in activity_data]
+            activity_scores = [item['score'] for item in activity_data]
             
-            # Average resolution time
-            fig_activity.add_trace(
-                go.Bar(
-                    x=project_names, 
-                    y=avg_resolution_days, 
-                    name="Avg Resolution Time", 
-                    marker_color='#F59E0B',
-                    hovertemplate='<b>%{x}</b><br>Resolution Time: %{y} days<extra></extra>',
-                    showlegend=False
-                ),
-                row=1, col=2
-            )
+            # Create color mapping based on activity level
+            colors = []
+            for score in activity_scores:
+                if score >= 70:
+                    colors.append('#10B981')  # High activity - green
+                elif score >= 40:
+                    colors.append('#3B82F6')  # Moderate activity - blue  
+                elif score >= 15:
+                    colors.append('#F59E0B')  # Low activity - amber
+                else:
+                    colors.append('#6B7280')  # Dormant - gray
             
-            # Update layout with proper y-axis ranges and formatting
-            fig_activity.update_layout(
-                title_text="Issue Resolution Metrics",
-                height=450,
-                showlegend=True,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1
+            # Create hover text with breakdown details
+            hover_texts = []
+            for item in activity_data:
+                breakdown = item['breakdown']
+                hover_text = (
+                    f"<b>{item['name']}</b><br>"
+                    f"Activity Score: {item['score']}/100<br><br>"
+                    f"<b>Development:</b><br>"
+                    f"• Commits: {breakdown['commits']}<br>"
+                    f"• Contributors: {breakdown['contributors']}<br><br>"
+                    f"<b>Production:</b><br>"
+                    f"• Sentry Events: {breakdown['sentry_events']}<br>"
+                    f"• Active Issues: {breakdown['sentry_issues']}<br><br>"
+                    f"<b>Engagement:</b><br>"
+                    f"• GitHub Stars: {breakdown['stars']}"
+                    f"<extra></extra>"
                 )
+                hover_texts.append(hover_text)
+            
+            # Create horizontal bar chart
+            fig_activity = go.Figure(data=[
+                go.Bar(
+                    y=project_names,
+                    x=activity_scores,
+                    orientation='h',
+                    marker_color=colors,
+                    hovertemplate=hover_texts,
+                    text=[f"{score}" for score in activity_scores],
+                    textposition='inside',
+                    textfont=dict(color='white', size=12)
+                )
+            ])
+            
+            fig_activity.update_layout(
+                title={
+                    'text': "Development Activity Dashboard<br><sub>Which repositories are actively developed and used (Past 30 Days)</sub>",
+                    'x': 0.5,
+                    'xanchor': 'center',
+                    'font': {'size': 20}
+                },
+                height=max(600, len(projects) * 35 + 150),  # Dynamic height based on number of repos
+                xaxis_title="Activity Score (0-100)",
+                yaxis_title="",
+                showlegend=False,
+                margin=dict(l=150, r=50, t=100, b=50),  # More left margin for repo names
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
             )
             
-            # Set y-axis ranges to start from 0 and add some padding at the top
-            max_issues = max(max(issues_created + issues_resolved, default=0), 1)
-            max_resolution = max(max(avg_resolution_days, default=0), 1)
-            
-            fig_activity.update_yaxes(
-                range=[0, max_issues * 1.1], 
-                row=1, col=1,
-                title_text="Number of Issues"
+            # Update axes
+            fig_activity.update_xaxes(
+                range=[0, 100],
+                showgrid=True,
+                gridcolor='rgba(0,0,0,0.1)',
+                gridwidth=1
             )
             fig_activity.update_yaxes(
-                range=[0, max_resolution * 1.1], 
-                row=1, col=2,
-                title_text="Days"
+                showgrid=False,
+                tickmode='linear'
             )
             
             charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs=False, div_id="activity-chart")
         
         return charts
+    
+    def _calculate_activity_score(self, project: Dict) -> tuple[int, Dict]:
+        """
+        Calculate a composite activity score (0-100) for a project based on:
+        - Development activity (commits, contributors) - 50%
+        - Production usage (Sentry events/issues) - 30% 
+        - Community engagement (stars, GitHub issues) - 20%
+        """
+        
+        # Extract data with safe defaults
+        commits = project.get('github_commits', {}).get('past_month', {}).get('total', 0)
+        contributors = project.get('github_commits', {}).get('past_month', {}).get('unique_authors', 0)
+        stars = project.get('github_metadata', {}).get('stars', 0)
+        github_issues = project.get('github_issues', {}).get('past_month', {}).get('created', 0)
+        sentry_events = project.get('sentry_issues', {}).get('events_count', 0)
+        sentry_issues = project.get('sentry_issues', {}).get('past_month', {}).get('total', 0)
+        
+        # Development Activity Score (0-50 points)
+        # Commits: 0-30 commits = 0-30 points (capped at 30)
+        commit_score = min(commits, 30) 
+        # Contributors: 0-10 contributors = 0-20 points (capped at 10)
+        contributor_score = min(contributors * 2, 20)
+        dev_score = commit_score + contributor_score
+        
+        # Production Usage Score (0-30 points) 
+        # Sentry events indicate active production usage
+        # 0-100 events = 0-20 points, 0-10 issues = 0-10 points
+        sentry_event_score = min(sentry_events / 5, 20)  # 5 events = 1 point
+        sentry_issue_score = min(sentry_issues, 10)  # 1 issue = 1 point
+        production_score = sentry_event_score + sentry_issue_score
+        
+        # Community Engagement Score (0-20 points)
+        # Stars indicate project popularity/usage
+        # GitHub issues indicate community engagement
+        star_score = min(stars / 5, 15)  # 5 stars = 1 point, max 15
+        github_issue_score = min(github_issues, 5)  # 1 issue = 1 point, max 5  
+        engagement_score = star_score + github_issue_score
+        
+        # Total score (0-100)
+        total_score = int(dev_score + production_score + engagement_score)
+        
+        # Return score and breakdown for hover details
+        breakdown = {
+            'commits': commits,
+            'contributors': contributors, 
+            'stars': stars,
+            'sentry_events': sentry_events,
+            'sentry_issues': sentry_issues
+        }
+        
+        return total_score, breakdown
     
     def _generate_project_report(self, project_data: Dict) -> str:
         """Generate HTML report for a single project."""
