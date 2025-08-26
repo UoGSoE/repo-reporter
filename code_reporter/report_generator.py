@@ -469,10 +469,50 @@ class ReportGenerator:
         
         risk_score = (vulnerable_projects / max(total_projects, 1)) * 100
         
+        # Enhance each project with template-specific variables for consistency with individual project reports
+        enhanced_projects = {}
+        logger = get_logger()
+        
+        for repo_url, project_data in processed_data['projects'].items():
+            if project_data.get('success'):
+                # Generate dependency license chart for this project (same logic as individual project reports)
+                project_dep_license_chart = None
+                dep_licenses = project_data.get('dependency_licenses', {})
+                if dep_licenses:
+                    logger.debug(f"Chart data for {project_data['name']}: {dep_licenses}")
+                    # Ensure values are proper native Python integers for Plotly
+                    chart_values = [int(v) if v is not None else 0 for v in dep_licenses.values()]
+                    chart_names = list(dep_licenses.keys())
+                    # Force to native Python types to avoid numpy encoding issues
+                    chart_values = [int(x) for x in chart_values]
+                    logger.debug(f"Chart values: {chart_values}, names: {chart_names}")
+                    
+                    # Use graph_objects for explicit control over data types
+                    fig_project_dep_licenses = go.Figure(data=[go.Pie(
+                        labels=chart_names,
+                        values=chart_values,
+                        textinfo='label+percent',
+                        hovertemplate='<b>%{label}</b><br>Dependencies: %{value}<br>Percentage: %{percent}<extra></extra>'
+                    )])
+                    fig_project_dep_licenses.update_layout(title_text="Dependency License Distribution")
+                    project_dep_license_chart = fig_project_dep_licenses.to_html(include_plotlyjs=False, div_id=f"combined-project-dep-license-chart-{project_data['name']}")
+                
+                # Create enhanced project data with template variables
+                enhanced_project = dict(project_data)
+                enhanced_project.update({
+                    'dependency_license_chart': project_dep_license_chart,
+                    'has_vulnerabilities': len(project_data.get('vulnerabilities', [])) > 0,
+                    'vulnerability_count': len(project_data.get('vulnerabilities', [])),
+                    'dependency_count': project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)
+                })
+                enhanced_projects[repo_url] = enhanced_project
+            else:
+                enhanced_projects[repo_url] = project_data
+        
         template_data = {
             'summary': summary,
             'charts': charts,
-            'projects': processed_data['projects'],  # Keep as dict for template iteration
+            'projects': enhanced_projects,  # Use enhanced projects with template variables
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'llm_summary': processed_data.get('llm_summary'),
             'risk_metrics': {
