@@ -37,6 +37,26 @@ class LLMAnalyzer:
         else:
             raise ValueError("No LLM API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY")
     
+    def _read_local_context(self) -> Optional[str]:
+        """Read local context from local_context.txt file if it exists."""
+        try:
+            # Find project root by looking for main.py
+            current_dir = Path(__file__).parent
+            while current_dir != current_dir.parent:
+                main_py_path = current_dir / "main.py"
+                if main_py_path.exists():
+                    # Found project root, check for local_context.txt
+                    context_file = current_dir / "local_context.txt"
+                    if context_file.exists():
+                        content = context_file.read_text(encoding='utf-8').strip()
+                        return content
+                    break
+                current_dir = current_dir.parent
+        except Exception:
+            # Silently fail if we can't read the context file
+            pass
+        return None
+    
     def generate_executive_summary(self, processed_data: Dict) -> str:
         """
         Generate an executive summary using LLM analysis.
@@ -50,19 +70,27 @@ class LLMAnalyzer:
         # Prepare context for the LLM
         context = self._prepare_llm_context(processed_data)
         
+        # Read local context if available
+        local_context = self._read_local_context()
+        
         # Load and render the prompt template
         try:
             template = self.jinja_env.get_template('executive_summary_prompt.txt')
             prompt = template.render(
                 context=context,
-                context_json=json.dumps(context, indent=2)
+                context_json=json.dumps(context, indent=2),
+                local_context=local_context
             )
         except Exception as e:
             # Fallback to hardcoded prompt if template fails
+            local_context_section = ""
+            if local_context:
+                local_context_section = f"\nLOCAL CONTEXT:\n{local_context}\n"
+            
             prompt = f"""You are a strategic technology advisor preparing an executive briefing for senior leadership.
 
 You have been provided with individual project summaries and portfolio metrics. Synthesize this into a cohesive narrative.
-
+{local_context_section}
 PORTFOLIO DATA:
 {json.dumps(context, indent=2)}
 
@@ -76,6 +104,7 @@ Guidelines:
 - Focus on business impact
 - Use natural, engaging language
 - Emphasize strategic decisions
+- Incorporate the local context above to make the summary relevant to the organization
 
 Remember: This is about the forest, not the trees."""
 

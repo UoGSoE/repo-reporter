@@ -2,8 +2,13 @@ You are a strategic technology advisor preparing an executive briefing for senio
 
 You have been provided with individual project summaries and portfolio metrics. Synthesize this into a cohesive narrative.
 
+{% if local_context %}
+LOCAL CONTEXT:
+{{ local_context }}
+
+{% endif %}
 PORTFOLIO DATA:
-{json.dumps(context, indent=2)}
+{{ context_json }}
 
 Write a short 3-4 paragraph executive summary that:
 1. Opens with strategic context - the portfolio's overall health and trajectory
@@ -15,6 +20,7 @@ Guidelines:
 - Focus on business impact
 - Use natural, engaging language
 - Emphasize strategic decisions
-
+{% if local_context %}- Incorporate the local context above to make the summary relevant to the organization
+{% endif %}
 Remember: This is about the forest, not the trees.
 

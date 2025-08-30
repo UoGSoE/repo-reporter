@@ -36,6 +36,7 @@ A comprehensive tool that analyzes GitHub repositories and generates detailed re
 - **HTML reports**: Interactive reports with Plotly charts
 - **PDF generation**: Print-ready executive summaries
 - **LLM-powered insights**: AI-generated project and executive summaries
+- **Local context integration**: Customize summaries with organizational details
 - **Responsive design**: Mobile-friendly layouts
 
 ## Quick Start
@@ -180,6 +181,35 @@ If SCC is not installed, the tool will:
 - ✅ Generate all other reports normally (dependencies, security, GitHub, Sentry)
 - ℹ️ Show "SCC Tool Not Available" messages in code metrics sections
 - 📖 Include installation instructions in the generated reports
+
+### Local Context (Optional)
+
+Customize executive summaries with organizational context by creating a `local_context.txt` file in your project root:
+
+```text
+# local_context.txt
+MegaCorp.com: Dedicated B2B software for the automotive industry
+Team: 12 developers across 3 teams - Backend, Frontend, Mobile
+Upcoming projects: Engine monitoring system, Vehicle tracking system
+Report Focus: A broad idea of the health of the development team and their projects
+```
+
+#### What Local Context Provides
+- **Tailored summaries**: LLM generates summaries relevant to your organization
+- **Strategic context**: Incorporates team size, upcoming projects, and institutional focus
+- **Stakeholder relevance**: Makes reports more meaningful for your specific audience
+- **Optional feature**: Works seamlessly with or without the context file
+
+#### Example Context Elements
+- Organization name and type
+- Team size and structure
+- Upcoming projects or initiatives
+- Key stakeholders or user base
+- Strategic priorities
+- Compliance requirements
+- Budget constraints or opportunities
+
+Copy `local_context.example.txt` to `local_context.txt` and customize for your organization.
 
 ## Report Structure
 

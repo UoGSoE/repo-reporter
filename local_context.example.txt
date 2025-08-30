@@ -1,0 +1,16 @@
+# Example Local Context File
+# Copy this to local_context.txt in your project root to customize executive summaries
+
+MegaCorp.com: Dedicated B2B software for the automotive industry
+Team: 12 developers across 3 teams - Backend, Frontend, Mobile
+Upcoming projects: Engine monitoring system, Vehicle tracking system
+Report Focus: A broad idea of the health of the development team and their projects
+
+# Add any context that would help the LLM generate more relevant summaries:
+# - Organization name and type
+# - Team size and structure  
+# - Upcoming projects or initiatives
+# - Key stakeholders or user base
+# - Strategic priorities
+# - Compliance requirements
+# - Budget constraints or opportunities

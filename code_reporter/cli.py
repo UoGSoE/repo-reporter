@@ -44,8 +44,8 @@ from .logger import init_logger, get_logger
 )
 @click.option(
     '--llm',
-    default='openai/o4-mini',
-    help='LLM model to use for executive summary generation (default: openai/o4-mini)'
+    default='openai/gpt-5-mini',
+    help='LLM model to use for executive summary generation (default: openai/gpt-5-minie)'
 )
 def main(
     repo_list_file: Path,

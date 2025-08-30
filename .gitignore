@@ -9,3 +9,5 @@ reports*
 !GITHUB_ACTION_SETUP.md
 !PROMPT_CUSTOMIZATION.md
 test_repo*
+local_context.txt
+
