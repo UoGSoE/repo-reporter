@@ -85,6 +85,7 @@ def main(
     from .github_analyzer import GitHubAnalyzer
     from .dependency_analyzer import DependencyAnalyzer
     from .sentry_analyzer import SentryAnalyzer
+    from .scc_analyzer import SCCAnalyzer
     from .report_generator import ReportGenerator
     
     logger.info("Starting repository analysis")
@@ -105,6 +106,7 @@ def main(
         auth_token=config['sentry']['auth_token'],
         organization_slug=os.getenv('SENTRY_ORG_SLUG')
     )
+    scc_analyzer = SCCAnalyzer()
     
     # Analyze repositories
     analysis_results = {}
@@ -140,6 +142,11 @@ def main(
                     logger.debug(f"Calling Sentry analyzer for {repo_info.owner}/{repo_info.name}")
                     sentry_stats = sentry_analyzer.analyze_repository(repo_info.owner, repo_info.name)
                     logger.debug(f"Sentry analysis result: success={sentry_stats.get('success', False)}, projects={len(sentry_stats.get('projects', []))}")
+                    
+                    # Analyze code metrics with SCC
+                    logger.debug(f"Calling SCC analyzer for {repo_info.owner}/{repo_info.name}")
+                    scc_stats = scc_analyzer.analyze_repository(repo_info.local_path)
+                    logger.debug(f"SCC analysis result: success={scc_stats.get('success', False)}, lines={scc_stats.get('totals', {}).get('lines', 0)}")
                     
                     # Display results
                     if language_info['primary_language']:
@@ -210,13 +217,25 @@ def main(
                     elif sentry_analyzer.enabled and not sentry_stats['success']:
                         logger.debug(f"Sentry analysis failed: {sentry_stats.get('error', 'Analysis failed')}")
                     
+                    # Display SCC code metrics
+                    if scc_stats['success'] and scc_analyzer.enabled:
+                        totals = scc_stats['totals']
+                        logger.debug(f"Code metrics: {totals['lines']} total lines, {totals['files']} files")
+                        if scc_stats['estimated_cost'] > 0:
+                            cost = scc_analyzer.format_cost(scc_stats['estimated_cost'])
+                            schedule = scc_analyzer.format_schedule(scc_stats['estimated_schedule_months'])
+                            logger.debug(f"COCOMO estimates: {cost}, {schedule}")
+                    elif scc_analyzer.enabled and not scc_stats['success']:
+                        logger.debug(f"SCC analysis failed: {scc_stats.get('error', 'Analysis failed')}")
+                    
                     analysis_results[repo_url] = {
                         'success': True,
                         'repo_info': repo_info,
                         'language_info': language_info,
                         'github_stats': github_stats,
                         'dependency_info': dependency_info,
-                        'sentry_stats': sentry_stats
+                        'sentry_stats': sentry_stats,
+                        'scc_stats': scc_stats
                     }
                     
                 except Exception as e:

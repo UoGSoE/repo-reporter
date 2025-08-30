@@ -16,6 +16,12 @@ A comprehensive tool that analyzes GitHub repositories and generates detailed re
 - **Dependency security**: Identifies vulnerable packages with severity ratings
 - **Security alerts**: Highlighted warnings in reports
 
+### Code Metrics (SCC Integration)
+- **Lines of code analysis**: Total lines, code lines, comments, and complexity metrics
+- **COCOMO estimates**: Development cost, timeline, and team size projections
+- **Language breakdown**: Detailed metrics by programming language
+- **Portfolio totals**: Executive summary with cross-project code metrics
+
 ### GitHub Integration
 - **Activity metrics**: Commit history, contributor analysis, issue tracking
 - **Repository metadata**: Stars, forks, license information  
@@ -156,6 +162,26 @@ The tool uses a **3-strategy matching system** to connect your GitHub repositori
 
 **No Perfect Names Required!** The system is designed to work with real-world naming conventions where your GitHub repo and Sentry project names might not match exactly. Just keep them reasonably similar and the tool will find the connections automatically.
 
+### SCC Setup (Optional)
+
+Code metrics and COCOMO estimates require the **SCC (Source Code Counter)** tool:
+
+1. **Install SCC**: Visit [github.com/boyter/scc](https://github.com/boyter/scc) for installation instructions
+2. **Verify Installation**: Run `scc --version` to confirm it's available
+3. **Automatic Detection**: The tool will automatically use SCC if available
+
+#### What SCC Provides
+- **Code Metrics**: Lines of code, complexity analysis, file counts
+- **Language Breakdown**: Detailed metrics for each programming language
+- **COCOMO Estimates**: Development cost, timeline, and team size projections
+- **Portfolio Totals**: Cross-project code metrics in executive summary
+
+#### Without SCC
+If SCC is not installed, the tool will:
+- ✅ Generate all other reports normally (dependencies, security, GitHub, Sentry)
+- ℹ️ Show "SCC Tool Not Available" messages in code metrics sections
+- 📖 Include installation instructions in the generated reports
+
 ## Report Structure
 
 ### Executive Summary
@@ -167,6 +193,7 @@ The tool uses a **3-strategy matching system** to connect your GitHub repositori
 ### Individual Project Reports  
 - **Project Overview**: Stars, forks, activity metrics
 - **Technology Stack**: Languages, frameworks, versions
+- **Code Metrics**: Lines of code, complexity, COCOMO estimates (if SCC available)
 - **Dependencies**: Package analysis with security scanning
 - **GitHub Activity**: Recent commits, issues, contributors
 - **Sentry Errors**: Production error tracking (if configured)
@@ -189,6 +216,11 @@ The tool uses a **3-strategy matching system** to connect your GitHub repositori
 - Verify API keys are correct
 - Check model name format (e.g., `openai/gpt-4`)
 - Reports still generate without LLM summaries
+
+**"SCC Tool Not Available"**
+- Install SCC from [github.com/boyter/scc](https://github.com/boyter/scc)
+- Verify with `scc --version`
+- Reports generate normally without code metrics
 
 ### Debug Mode
 

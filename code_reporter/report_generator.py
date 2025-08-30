@@ -48,7 +48,47 @@ class ReportGenerator:
             md = markdown.Markdown(extensions=['extra', 'nl2br'])
             return md.convert(text)
         
+        # Add custom number formatting filter
+        def number_format_filter(value):
+            """Format numbers with thousands separators."""
+            if value is None:
+                return "0"
+            try:
+                return f"{int(value):,}"
+            except (ValueError, TypeError):
+                return str(value)
+        
+        # Add custom currency formatting filter
+        def currency_format_filter(value):
+            """Format currency values with appropriate units (K/M)."""
+            if value is None or value == 0:
+                return "$0"
+            
+            try:
+                value = float(value)
+                if value >= 1000000:
+                    # Format as millions
+                    millions = value / 1000000
+                    if millions >= 10:
+                        return f"${millions:.0f}M"
+                    else:
+                        return f"${millions:.1f}M"
+                elif value >= 1000:
+                    # Format as thousands
+                    thousands = value / 1000
+                    if thousands >= 100:
+                        return f"${thousands:.0f}K"
+                    else:
+                        return f"${thousands:.0f}K"
+                else:
+                    # Less than 1000, show as dollars
+                    return f"${value:.0f}"
+            except (ValueError, TypeError):
+                return str(value)
+        
         self.jinja_env.filters['markdown'] = markdown_filter
+        self.jinja_env.filters['number_format'] = number_format_filter
+        self.jinja_env.filters['currency_format'] = currency_format_filter
         
         # Create templates if they don't exist
         self._ensure_templates()
@@ -146,6 +186,18 @@ class ReportGenerator:
                     'total_sentry_events': 0,
                     'avg_resolution_time': 0.0,
                     'projects_with_errors': 0
+                },
+                'scc_metrics': {
+                    'projects_with_scc': 0,
+                    'total_lines': 0,
+                    'total_code_lines': 0,
+                    'total_comment_lines': 0,
+                    'total_blank_lines': 0,
+                    'total_files': 0,
+                    'total_complexity': 0,
+                    'total_estimated_cost': 0.0,
+                    'total_estimated_schedule_months': 0.0,
+                    'total_estimated_people': 0.0
                 }
             },
             'charts': {}
@@ -164,6 +216,7 @@ class ReportGenerator:
             github_stats = result.get('github_stats', {})
             dependency_info = result.get('dependency_info', {})
             sentry_stats = result.get('sentry_stats', {})
+            scc_stats = result.get('scc_stats', {})
             
             project_data = {
                 'success': True,
@@ -182,7 +235,13 @@ class ReportGenerator:
                 'dependency_licenses': dependency_info.get('licenses', {}),
                 'sentry_issues': sentry_stats.get('issues', {}),
                 'sentry_projects': sentry_stats.get('projects', []),
-                'sentry_enabled': sentry_stats.get('success', False)
+                'sentry_enabled': sentry_stats.get('success', False),
+                'scc_metrics': scc_stats.get('totals', {}),
+                'scc_language_summary': scc_stats.get('language_summary', []),
+                'scc_estimated_cost': scc_stats.get('estimated_cost', 0.0),
+                'scc_estimated_schedule_months': scc_stats.get('estimated_schedule_months', 0.0),
+                'scc_estimated_people': scc_stats.get('estimated_people', 0.0),
+                'scc_enabled': scc_stats.get('success', False)
             }
             
             processed['projects'][repo_url] = project_data
@@ -287,6 +346,23 @@ class ReportGenerator:
                 summary['sentry_metrics']['avg_resolution_time'] = (
                     (current_avg * (projects_count - 1) + resolution_time) / projects_count
                 )
+        
+        # SCC code metrics
+        if project_data.get('scc_enabled'):
+            summary['scc_metrics']['projects_with_scc'] += 1
+            
+            scc_metrics = project_data.get('scc_metrics', {})
+            summary['scc_metrics']['total_lines'] += scc_metrics.get('lines', 0)
+            summary['scc_metrics']['total_code_lines'] += scc_metrics.get('code_lines', 0)
+            summary['scc_metrics']['total_comment_lines'] += scc_metrics.get('comment_lines', 0)
+            summary['scc_metrics']['total_blank_lines'] += scc_metrics.get('blank_lines', 0)
+            summary['scc_metrics']['total_files'] += scc_metrics.get('files', 0)
+            summary['scc_metrics']['total_complexity'] += scc_metrics.get('complexity', 0)
+            
+            # COCOMO estimates
+            summary['scc_metrics']['total_estimated_cost'] += project_data.get('scc_estimated_cost', 0.0)
+            summary['scc_metrics']['total_estimated_schedule_months'] += project_data.get('scc_estimated_schedule_months', 0.0)
+            summary['scc_metrics']['total_estimated_people'] += project_data.get('scc_estimated_people', 0.0)
     
     def _generate_charts(self, processed_data: Dict) -> Dict:
         """Generate chart data for the reports."""

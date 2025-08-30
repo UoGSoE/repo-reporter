@@ -357,6 +357,188 @@
     </div>
 </div>
 
+<!-- Code Metrics -->
+{% if project.scc_enabled %}
+<div class="mb-12">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="bg-gradient-to-r from-purple-600 to-purple-700 p-8 text-white">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 3v2H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2V3h-2v2h-4V3H9zm0 6h6v2H9V9zm0 4h6v2H9v-2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-3xl font-bold">Code Metrics</h3>
+                    <p class="text-purple-200">Source code analysis and complexity metrics</p>
+                </div>
+            </div>
+        </div>
+        <div class="p-8">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="group hover:scale-105 transition-transform duration-200">
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl text-center border border-purple-200">
+                        <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>
+                            </svg>
+                        </div>
+                        <div class="text-3xl font-bold text-purple-600 mb-1">{{ project.scc_metrics.lines | default(0) | number_format }}</div>
+                        <div class="text-sm font-medium text-slate-600">Total Lines</div>
+                        <div class="text-xs text-slate-500 mt-1">All code, comments, blanks</div>
+                    </div>
+                </div>
+                
+                <div class="group hover:scale-105 transition-transform duration-200">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl text-center border border-blue-200">
+                        <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 3a1 1 0 000 2v.5c0 1.5 0 2 .5 2.5S10 8.5 11.5 8.5h1c1.5 0 2 0 2.5-.5S15.5 6.5 15.5 5V5a1 1 0 100-2H8zm3 6H7l-1.5 1.5L4 10v8l1.5 1.5L7 21h10l1.5-1.5L20 18v-8l-1.5-1.5L17 7h-4z"/>
+                            </svg>
+                        </div>
+                        <div class="text-3xl font-bold text-blue-600 mb-1">{{ project.scc_metrics.code_lines | default(0) | number_format }}</div>
+                        <div class="text-sm font-medium text-slate-600">Code Lines</div>
+                        <div class="text-xs text-slate-500 mt-1">Executable code only</div>
+                    </div>
+                </div>
+                
+                <div class="group hover:scale-105 transition-transform duration-200">
+                    <div class="bg-gradient-to-br from-amber-50 to-amber-100 p-6 rounded-xl text-center border border-amber-200">
+                        <div class="w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                        </div>
+                        <div class="text-3xl font-bold text-amber-600 mb-1">{{ project.scc_metrics.complexity | default(0) | number_format }}</div>
+                        <div class="text-sm font-medium text-slate-600">Complexity</div>
+                        <div class="text-xs text-slate-500 mt-1">Cyclomatic complexity</div>
+                    </div>
+                </div>
+                
+                <div class="group hover:scale-105 transition-transform duration-200">
+                    <div class="bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-xl text-center border border-slate-200">
+                        <div class="w-12 h-12 bg-slate-500 rounded-lg flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M13 9h5.5L13 3.5V9M6 2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4c0-1.11.89-2 2-2m5 2H6v16h12v-9h-7V4z"/>
+                            </svg>
+                        </div>
+                        <div class="text-3xl font-bold text-slate-600 mb-1">{{ project.scc_metrics.files | default(0) | number_format }}</div>
+                        <div class="text-sm font-medium text-slate-600">Files</div>
+                        <div class="text-xs text-slate-500 mt-1">Source files analyzed</div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if project.scc_estimated_cost > 0 %}
+            <div class="mb-8">
+                <div class="bg-gradient-to-br from-success-50 to-success-100 p-6 rounded-xl border border-success-200">
+                    <h4 class="text-xl font-semibold text-slate-800 mb-6 flex items-center">
+                        <div class="w-8 h-8 bg-success-500 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M7 4V2a1 1 0 0 1 2 0v2h6V2a1 1 0 0 1 2 0v2h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1z"/>
+                            </svg>
+                        </div>
+                        COCOMO Project Estimates
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="text-center p-4 bg-white rounded-lg border border-success-200">
+                            <div class="text-3xl font-bold text-success-600 mb-2">
+                                {{ project.scc_estimated_cost | currency_format }}
+                            </div>
+                            <div class="text-sm font-medium text-slate-600">Estimated Cost</div>
+                            <div class="text-xs text-slate-500 mt-1">Development cost estimate</div>
+                        </div>
+                        <div class="text-center p-4 bg-white rounded-lg border border-success-200">
+                            <div class="text-3xl font-bold text-success-600 mb-2">
+                                {{ "%.1f"|format(project.scc_estimated_schedule_months) }}
+                            </div>
+                            <div class="text-sm font-medium text-slate-600">Schedule (Months)</div>
+                            <div class="text-xs text-slate-500 mt-1">Time to develop</div>
+                        </div>
+                        <div class="text-center p-4 bg-white rounded-lg border border-success-200">
+                            <div class="text-3xl font-bold text-success-600 mb-2">
+                                {{ "%.1f"|format(project.scc_estimated_people) }}
+                            </div>
+                            <div class="text-sm font-medium text-slate-600">Team Size</div>
+                            <div class="text-xs text-slate-500 mt-1">Estimated developers</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if project.scc_language_summary %}
+            <div class="mb-6">
+                <h4 class="text-xl font-semibold text-slate-800 mb-6">Language Breakdown</h4>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {% for lang in project.scc_language_summary[:8] %}
+                    <div class="bg-gradient-to-r from-white to-slate-50 p-4 rounded-lg border border-slate-200">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h5 class="font-semibold text-slate-800">{{ lang.Name }}</h5>
+                                <p class="text-sm text-slate-600">{{ lang.Count }} files</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-purple-600">{{ lang.Lines | number_format }}</p>
+                                <p class="text-xs text-slate-500">lines</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3 text-xs">
+                            <div class="text-center">
+                                <span class="block font-medium text-blue-600">{{ lang.Code | number_format }}</span>
+                                <span class="text-slate-500">Code</span>
+                            </div>
+                            <div class="text-center">
+                                <span class="block font-medium text-success-600">{{ lang.Comment | number_format }}</span>
+                                <span class="text-slate-500">Comments</span>
+                            </div>
+                            <div class="text-center">
+                                <span class="block font-medium text-amber-600">{{ lang.Complexity | number_format }}</span>
+                                <span class="text-slate-500">Complexity</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="mb-12">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="bg-gradient-to-r from-slate-600 to-slate-700 p-8 text-white">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 3v2H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2V3h-2v2h-4V3H9zm0 6h6v2H9V9zm0 4h6v2H9v-2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-3xl font-bold">Code Metrics</h3>
+                    <p class="text-slate-200">Integration status</p>
+                </div>
+            </div>
+        </div>
+        <div class="p-8">
+            <div class="text-center py-12">
+                <div class="w-16 h-16 bg-warning-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-warning-600" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h4 class="text-2xl font-bold text-warning-600 mb-4">SCC Tool Not Available</h4>
+                <p class="text-slate-600 max-w-lg mx-auto mb-4">Code metrics analysis requires the SCC (Source Code Counter) tool.</p>
+                <div class="bg-slate-50 p-4 rounded-lg max-w-md mx-auto">
+                    <p class="text-sm text-slate-600"><strong>To enable:</strong> Install SCC from <a href="https://github.com/boyter/scc" target="_blank" class="text-primary-600 underline">github.com/boyter/scc</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Error Monitoring -->
 {% if project.sentry_enabled %}
 <div class="mb-12">
