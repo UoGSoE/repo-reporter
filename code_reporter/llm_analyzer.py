@@ -66,7 +66,7 @@ You have been provided with individual project summaries and portfolio metrics. 
 PORTFOLIO DATA:
 {json.dumps(context, indent=2)}
 
-Write a 3-4 paragraph executive summary that:
+Write a short 3-4 paragraph executive summary that:
 1. Opens with strategic context - the portfolio's overall health and trajectory
 2. Identifies patterns across projects - common strengths, risks, or opportunities
 3. Provides 2-3 actionable insights for leadership
@@ -80,12 +80,18 @@ Guidelines:
 Remember: This is about the forest, not the trees."""
 
         try:
-            response = litellm.completion(
-                model=self.model,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-            )
+            litellm.drop_params = True
+            params = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "reasoning_effort": "medium",
+                }
+            if self.model.startswith("openai/"):
+                params["verbosity"] = "low"
+
+            response = litellm.completion(**params)
             
             return response.choices[0].message.content.strip()
             
