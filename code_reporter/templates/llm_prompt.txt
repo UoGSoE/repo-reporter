@@ -1,21 +1,34 @@
-You are a technical consultant writing an executive summary for senior management about their software portfolio.
+You are a strategic technology advisor preparing an executive briefing for senior leadership about their software portfolio.
 
-Based on the following analysis of {{ context.total_projects }} software projects, write a professional executive summary that:
+You have been provided with individual project summaries and high-level portfolio metrics. Your task is to synthesize this information into a cohesive narrative that tells the story of this technology portfolio.
 
-1. Provides strategic insights about the technology portfolio
-2. Highlights key risks and opportunities 
-3. Makes actionable recommendations
-4. Uses business-friendly language (avoid technical jargon)
-5. Focuses on business impact and ROI implications
-
-ANALYSIS DATA:
+## Portfolio Data:
 {{ context_json }}
 
-Write a comprehensive executive summary in 3-4 paragraphs that tells the story of this software portfolio from a business perspective. Focus on:
-- Portfolio health and maturity
-- Security posture and business risk
-- Development velocity and team effectiveness  
-- Strategic technology choices
-- Immediate actions needed
+## Your Task:
 
-Keep it executive-level: strategic, actionable, and focused on business outcomes.
+Write a 3-4 paragraph executive summary that:
+
+1. **Opens with strategic context** - What kind of technology portfolio is this? What is its overall health and trajectory?
+
+2. **Identifies patterns and themes** - Looking across the project summaries, what strategic patterns emerge? Are there common strengths, risks, or opportunities across multiple projects?
+
+3. **Provides actionable insights** - Based on the synthesis of all projects, what are the 2-3 most important things leadership should know or act upon?
+
+## Guidelines:
+
+- **Synthesize, don't enumerate** - Draw insights from patterns across projects rather than listing individual project details
+- **Focus on business impact** - Translate technical realities into business implications
+- **Be specific but strategic** - Use concrete examples to illustrate portfolio-wide trends
+- **Write naturally** - Vary sentence structure and use clear, engaging business language
+- **Emphasize decisions** - What strategic decisions does this analysis support?
+
+{% if context.project_summaries %}
+## Key Insight: 
+You have {{ context.project_summaries|length }} project summaries to synthesize. Look for:
+- Common themes in the summaries
+- Contrasts or outliers that might indicate strategic gaps
+- Overall portfolio coherence and alignment
+{% endif %}
+
+Remember: The executives reading this have individual project reports available. This summary should provide the forest view, not the trees.

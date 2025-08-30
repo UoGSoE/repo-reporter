@@ -58,27 +58,25 @@ class LLMAnalyzer:
             )
         except Exception as e:
             # Fallback to hardcoded prompt if template fails
-            prompt = f"""You are a technical consultant writing an executive summary for senior management about their software portfolio. 
+            prompt = f"""You are a strategic technology advisor preparing an executive briefing for senior leadership.
 
-Based on the following analysis of {context['total_projects']} software projects, write a professional executive summary that:
+You have been provided with individual project summaries and portfolio metrics. Synthesize this into a cohesive narrative.
 
-1. Provides strategic insights about the technology portfolio
-2. Highlights key risks and opportunities 
-3. Makes actionable recommendations
-4. Uses business-friendly language (avoid technical jargon)
-5. Focuses on business impact and ROI implications
-
-ANALYSIS DATA:
+PORTFOLIO DATA:
 {json.dumps(context, indent=2)}
 
-Write a comprehensive executive summary in 3-4 paragraphs that tells the story of this software portfolio from a business perspective. Focus on:
-- Portfolio health and maturity
-- Security posture and business risk
-- Development velocity and team effectiveness  
-- Strategic technology choices
-- Immediate actions needed
+Write a 3-4 paragraph executive summary that:
+1. Opens with strategic context - the portfolio's overall health and trajectory
+2. Identifies patterns across projects - common strengths, risks, or opportunities
+3. Provides 2-3 actionable insights for leadership
 
-Keep it executive-level: strategic, actionable, and focused on business outcomes."""
+Guidelines:
+- Synthesize patterns, don't list individual projects
+- Focus on business impact
+- Use natural, engaging language
+- Emphasize strategic decisions
+
+Remember: This is about the forest, not the trees."""
 
         try:
             response = litellm.completion(
@@ -147,93 +145,140 @@ Focus on business value, current status, and any concerns for management attenti
         summary = processed_data['summary']
         projects = processed_data['projects']
         
-        # Calculate additional insights
-        high_activity_projects = []
-        vulnerable_projects = []
-        popular_projects = []
+        # Collect project summaries for narrative synthesis
+        project_summaries = []
+        vulnerable_projects_count = 0
+        high_activity_count = 0
         
         for project in projects.values():
             if not project.get('success'):
                 continue
-                
-            # High activity (significant commits)
+            
+            # Collect LLM-generated project summaries if available
+            if project.get('llm_project_summary'):
+                project_summaries.append({
+                    'name': project['name'],
+                    'summary': project['llm_project_summary'],
+                    'language': project.get('primary_language', 'Unknown'),
+                    'has_vulnerabilities': project.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0
+                })
+            
+            # Count high-level metrics
+            if project.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0:
+                vulnerable_projects_count += 1
+            
             commits = project.get('github_commits', {}).get('past_month', {}).get('total', 0)
             if commits >= 10:
-                high_activity_projects.append({
-                    'name': project['name'],
-                    'commits': commits,
-                    'contributors': project.get('github_commits', {}).get('past_month', {}).get('unique_authors', 0)
-                })
-            
-            # Vulnerable projects
-            vuln_count = project.get('vulnerability_summary', {}).get('vulnerable_packages', 0)
-            if vuln_count > 0:
-                vulnerable_projects.append({
-                    'name': project['name'],
-                    'vulnerabilities': vuln_count,
-                    'critical_issues': len([v for v in project.get('vulnerabilities', []) 
-                                          if 'high' in str(v.get('vulnerability', {}).get('severity', '')).lower()])
-                })
-            
-            # Popular projects (high stars)
-            stars = project.get('github_metadata', {}).get('stars', 0)
-            if stars >= 1000:
-                popular_projects.append({
-                    'name': project['name'],
-                    'stars': stars,
-                    'language': project.get('primary_language')
-                })
+                high_activity_count += 1
+        
+        # Calculate portfolio-level insights
+        total_projects = summary['successful_analyses']
+        tech_diversity_score = len(summary['languages']) + len(summary['frameworks'])
+        
+        # Determine portfolio maturity based on various factors
+        portfolio_maturity = "emerging"
+        if summary['activity_metrics']['total_commits'] > 50:
+            portfolio_maturity = "active"
+        if summary['activity_metrics']['total_stars'] > 5000:
+            portfolio_maturity = "mature"
         
         context = {
-            'total_projects': summary['successful_analyses'],
-            'languages': dict(summary['languages']),
-            'frameworks': dict(summary['frameworks']),
-            'licenses': dict(summary['license_distribution']),
-            'security_metrics': {
-                'total_vulnerabilities': summary['total_vulnerabilities'],
-                'vulnerable_projects': len(vulnerable_projects),
-                'vulnerable_project_details': vulnerable_projects,
-                'risk_percentage': round((len(vulnerable_projects) / max(summary['successful_analyses'], 1)) * 100, 1)
+            # Project narratives for synthesis
+            'project_summaries': project_summaries,
+            
+            # High-level portfolio metrics only
+            'portfolio_overview': {
+                'total_projects': total_projects,
+                'technology_diversity': tech_diversity_score,
+                'portfolio_maturity': portfolio_maturity,
+                'primary_technologies': list(summary['languages'].keys())[:3],
+                'main_frameworks': list(summary['frameworks'].keys())[:3] if summary['frameworks'] else []
             },
-            'activity_metrics': {
-                'total_commits_month': summary['activity_metrics']['total_commits'],
-                'total_contributors': summary['activity_metrics']['total_contributors'],
-                'high_activity_projects': high_activity_projects,
-                'average_commits_per_project': round(summary['activity_metrics']['total_commits'] / max(summary['successful_analyses'], 1), 1)
+            
+            # Simplified risk assessment
+            'risk_assessment': {
+                'projects_at_risk': vulnerable_projects_count,
+                'risk_percentage': round((vulnerable_projects_count / max(total_projects, 1)) * 100, 1),
+                'total_vulnerabilities': summary['total_vulnerabilities']
             },
-            'popularity_metrics': {
+            
+            # Activity summary
+            'activity_summary': {
+                'high_activity_projects': high_activity_count,
+                'total_monthly_commits': summary['activity_metrics']['total_commits'],
+                'active_contributors': summary['activity_metrics']['total_contributors']
+            },
+            
+            # Business metrics
+            'business_metrics': {
                 'total_stars': summary['activity_metrics']['total_stars'],
                 'total_forks': summary['activity_metrics']['total_forks'],
-                'popular_projects': sorted(popular_projects, key=lambda x: x['stars'], reverse=True)[:3]
-            },
-            'technology_insights': {
-                'primary_languages': list(summary['languages'].keys()),
-                'framework_diversity': len(summary['frameworks']),
-                'license_compliance': len(summary['license_distribution']) > 0
-            },
-            'total_dependencies': summary['total_dependencies']
+                'dependency_count': summary['total_dependencies'],
+                'has_error_monitoring': summary['sentry_metrics']['projects_with_sentry'] > 0,
+                'monitored_projects': summary['sentry_metrics']['projects_with_sentry']
+            }
         }
+        
+        # Add COCOMO estimates if available
+        if summary.get('scc_metrics') and summary['scc_metrics'].get('projects_with_scc') > 0:
+            context['business_metrics']['estimated_value'] = summary['scc_metrics']['total_estimated_cost']
+            context['business_metrics']['code_volume'] = summary['scc_metrics']['total_lines']
         
         return context
     
     def _generate_fallback_summary(self, context: Dict) -> str:
-        """Generate a basic summary if LLM is unavailable."""
-        total_projects = context['total_projects']
-        vuln_projects = context['security_metrics']['vulnerable_projects']
-        risk_pct = context['security_metrics']['risk_percentage']
+        """Generate a more natural summary if LLM is unavailable."""
+        # Extract key metrics from the new context structure
+        total_projects = context['portfolio_overview']['total_projects']
+        portfolio_maturity = context['portfolio_overview']['portfolio_maturity']
+        tech_diversity = context['portfolio_overview']['technology_diversity']
+        vuln_projects = context['risk_assessment']['projects_at_risk']
+        risk_pct = context['risk_assessment']['risk_percentage']
+        monthly_commits = context['activity_summary']['total_monthly_commits']
+        high_activity = context['activity_summary']['high_activity_projects']
         
-        summary = f"""This analysis covers {total_projects} software projects representing your organization's technology portfolio. """
-        
-        if vuln_projects > 0:
-            summary += f"Security assessment reveals {vuln_projects} projects ({risk_pct}%) with known vulnerabilities requiring immediate attention. "
+        # Opening with portfolio characterization
+        if portfolio_maturity == "mature":
+            opening = f"Your technology portfolio comprises {total_projects} established projects with strong market presence and community engagement. "
+        elif portfolio_maturity == "active":
+            opening = f"The portfolio encompasses {total_projects} actively developed projects demonstrating solid momentum across the technology stack. "
         else:
-            summary += "Security posture is strong with no known vulnerabilities detected across the portfolio. "
+            opening = f"This emerging portfolio of {total_projects} projects represents your organization's evolving technology initiatives. "
         
-        summary += f"Development activity shows {context['activity_metrics']['total_commits_month']} commits in the past month, "
-        summary += f"indicating {'active' if context['activity_metrics']['total_commits_month'] > 20 else 'moderate'} ongoing development. "
+        # Technology and activity assessment
+        if tech_diversity > 5:
+            tech_assessment = f"The diverse technology stack spanning {tech_diversity} different languages and frameworks suggests a flexible, polyglot approach to solution development. "
+        else:
+            tech_assessment = f"With a focused technology stack, the portfolio maintains consistency and specialization in its technical approach. "
         
-        if context['popularity_metrics']['popular_projects']:
-            summary += f"The portfolio includes high-value assets with significant community adoption, "
-            summary += f"totaling {context['popularity_metrics']['total_stars']} GitHub stars across all projects."
+        if high_activity > total_projects * 0.5:
+            activity_assessment = f"Strong development velocity across {high_activity} highly active projects indicates healthy team engagement and continuous delivery practices."
+        elif monthly_commits > 20:
+            activity_assessment = f"Steady development activity with {monthly_commits} commits this month reflects consistent progress and maintenance across the portfolio."
+        else:
+            activity_assessment = f"Current development patterns suggest a maintenance-focused phase with selective enhancements."
+        
+        # Risk and recommendations
+        if vuln_projects > 0:
+            if risk_pct > 50:
+                risk_statement = f"\n\nImmediate attention is required for security remediation, with {vuln_projects} projects ({risk_pct:.0f}% of portfolio) containing known vulnerabilities. This represents a significant exposure that should be addressed through a coordinated security sprint. "
+            else:
+                risk_statement = f"\n\nWhile the portfolio shows overall strength, {vuln_projects} {'project requires' if vuln_projects == 1 else 'projects require'} security updates to maintain optimal risk posture. "
+        else:
+            risk_statement = "\n\nThe portfolio maintains a clean security profile with no detected vulnerabilities, positioning the organization well for compliance and risk management. "
+        
+        # Business context if available
+        business_context = ""
+        if context['business_metrics'].get('estimated_value'):
+            value = context['business_metrics']['estimated_value']
+            if value > 1000000:
+                business_context = f"The substantial codebase represents an estimated ${value/1000000:.1f}M in development investment, underscoring the strategic importance of proper governance and maintenance strategies."
+            elif value > 100000:
+                business_context = f"With an estimated development value of ${value/1000:.0f}K, the portfolio represents a significant technical asset requiring strategic oversight."
+        
+        # Combine into natural flowing summary
+        summary = opening + tech_assessment + activity_assessment + risk_statement
+        if business_context:
+            summary += business_context
         
         return summary
