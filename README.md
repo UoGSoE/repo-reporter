@@ -1,5 +1,4 @@
 # Code Reporter
-ython 
 
 A comprehensive tool that analyzes GitHub repositories and generates detailed reports covering code quality, security vulnerabilities, dependencies, development activity, and production error tracking via Sentry integration.
 
@@ -133,8 +132,8 @@ uv run main.py --help
 ### Supported LLM Models
 
 The tool uses LiteLLM, supporting models from:
-- **OpenAI**: `openai/gpt-4`, `openai/gpt-3.5-turbo`, `openai/o4-mini`
-- **Anthropic**: `anthropic/claude-3-sonnet`, `anthropic/claude-3-haiku`
+- OpenAI
+- Anthropic
 - **Many others**: See [LiteLLM docs](https://docs.litellm.ai/docs/providers)
 
 ### Sentry Setup
