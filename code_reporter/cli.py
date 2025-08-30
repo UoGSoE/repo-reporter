@@ -86,6 +86,7 @@ def main(
     from .dependency_analyzer import DependencyAnalyzer
     from .sentry_analyzer import SentryAnalyzer
     from .scc_analyzer import SCCAnalyzer
+    from .readme_parser import ReadmeParser
     from .report_generator import ReportGenerator
     
     logger.info("Starting repository analysis")
@@ -107,6 +108,7 @@ def main(
         organization_slug=os.getenv('SENTRY_ORG_SLUG')
     )
     scc_analyzer = SCCAnalyzer()
+    readme_parser = ReadmeParser()
     
     # Analyze repositories
     analysis_results = {}
@@ -131,6 +133,9 @@ def main(
                 try:
                     # Detect languages and frameworks
                     language_info = language_detector.analyze_repository(repo_info.local_path)
+                    
+                    # Parse README for project description
+                    readme_info = readme_parser.parse_repository(repo_info.local_path)
                     
                     # Analyze dependencies and vulnerabilities
                     dependency_info = dependency_analyzer.analyze_repository(repo_info.local_path, language_info)
@@ -232,6 +237,7 @@ def main(
                         'success': True,
                         'repo_info': repo_info,
                         'language_info': language_info,
+                        'readme_info': readme_info,
                         'github_stats': github_stats,
                         'dependency_info': dependency_info,
                         'sentry_stats': sentry_stats,

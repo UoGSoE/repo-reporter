@@ -3,12 +3,22 @@ You are writing a concise executive summary for a manager about a single softwar
 PROJECT: {{ project.name }}
 OWNER: {{ project.owner }}
 
-PROJECT DATA:
+{% if project.readme_info and project.readme_info.found %}
+PROJECT PURPOSE (from README):
+{{ project.readme_info.content }}
+{% elif project.github_metadata and project.github_metadata.description %}
+PROJECT PURPOSE (from GitHub):
+{{ project.github_metadata.description }}
+{% else %}
+PROJECT PURPOSE: No description available in README or GitHub metadata.
+{% endif %}
+
+TECHNICAL METRICS:
 {{ project_json }}
 
 Write a 2-3 sentence executive summary that covers:
-- What this project does (in business terms)
+- What this project does (using the README/description context above)
 - Current health and activity level
 - Key concerns or highlights for management attention
 
-Focus on business impact, risk assessment, and resource implications. Keep it under 100 words and suitable for a manager who needs the key points quickly.
+Focus on business impact, risk assessment, and resource implications. Keep it under 100 words and suitable for a manager who needs the key points quickly. Use the README content to explain the project's purpose in business terms, then connect the technical metrics to business outcomes.
