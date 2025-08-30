@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -16,8 +17,25 @@ class RepositoryManager:
     """Handles repository cloning, access, and cleanup."""
     
     def __init__(self, github_token: Optional[str] = None):
-        self.github_token = github_token
+        # Note: github_token parameter kept for backwards compatibility but not used
+        # gh CLI handles authentication automatically
         self.temp_dirs: List[Path] = []
+        # Verify gh CLI is available
+        self._verify_gh_cli()
+    
+    def _verify_gh_cli(self):
+        """Verify that gh CLI is available."""
+        try:
+            subprocess.run(
+                ['gh', '--version'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        except FileNotFoundError:
+            raise RuntimeError("gh CLI not found. Please install GitHub CLI.")
+        except subprocess.CalledProcessError:
+            raise RuntimeError("gh CLI is installed but not working properly.")
     
     @contextmanager
     def clone_repositories(self, repo_urls: List[str], progress_callback=None):
@@ -62,11 +80,16 @@ class RepositoryManager:
         self.temp_dirs.append(temp_dir)
         
         try:
-            # Handle different URL formats
-            clone_url = self._prepare_clone_url(repo_url)
+            # Use gh CLI to clone repository (handles both public and private repos)
+            result = subprocess.run(
+                ['gh', 'repo', 'clone', repo_url, str(temp_dir)],
+                capture_output=True,
+                text=True,
+                check=True
+            )
             
-            # Clone repository
-            repo = Repo.clone_from(clone_url, temp_dir)
+            # Open the cloned repository with GitPython for metadata access
+            repo = Repo(temp_dir)
             
             return RepoInfo(
                 url=repo_url,
@@ -85,32 +108,6 @@ class RepositoryManager:
                 repo=None
             )
     
-    def _prepare_clone_url(self, repo_url: str) -> str:
-        """
-        Prepare the clone URL with authentication if needed.
-        
-        Args:
-            repo_url: Original repository URL
-            
-        Returns:
-            Clone URL with authentication if available
-        """
-        if self.github_token:
-            # Convert to authenticated HTTPS URL
-            if repo_url.startswith('https://github.com/'):
-                # Extract owner/repo from URL
-                parts = repo_url.replace('https://github.com/', '').split('/')
-                if len(parts) >= 2:
-                    owner_repo = '/'.join(parts[:2])
-                    return f"https://{self.github_token}@github.com/{owner_repo}.git"
-            
-            elif repo_url.startswith('git@github.com:'):
-                # Convert SSH to HTTPS with token
-                parts = repo_url.replace('git@github.com:', '').replace('.git', '')
-                return f"https://{self.github_token}@github.com/{parts}.git"
-        
-        # Return original URL if no token or unsupported format
-        return repo_url
     
     def cleanup(self):
         """Remove all temporary directories."""
