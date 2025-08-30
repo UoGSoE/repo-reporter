@@ -85,8 +85,6 @@ Remember: This is about the forest, not the trees."""
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1000,
-                temperature=0.3
             )
             
             return response.choices[0].message.content.strip()
@@ -105,6 +103,9 @@ Remember: This is about the forest, not the trees."""
         Returns:
             Concise executive summary
         """
+        logger = get_logger()
+        logger.debug(f"Starting project summary generation for: {project_data.get('name', 'Unknown')}")
+        
         # Load and render the project summary prompt template
         try:
             template = self.jinja_env.get_template('project_summary_prompt.txt')
@@ -112,7 +113,9 @@ Remember: This is about the forest, not the trees."""
                 project=project_data,
                 project_json=json.dumps(project_data, indent=2)
             )
+            logger.debug(f"Template rendered successfully, prompt length: {len(prompt)} characters")
         except Exception as e:
+            logger.debug(f"Template rendering failed, using fallback prompt: {e}")
             # Fallback to simple prompt if template fails
             description = project_data.get('github_metadata', {}).get('description', 'No description available')
             language = project_data.get('primary_language', 'Unknown')
@@ -124,23 +127,36 @@ Description: {description}
 Technology: {language}
 
 Focus on business value, current status, and any concerns for management attention. Keep it under 100 words."""
+            logger.debug(f"Fallback prompt length: {len(prompt)} characters")
 
         try:
+            logger.debug(f"Calling LLM with model: {self.model}")
             # Prepare parameters, handling O-series model limitations
             params = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
             }
             
+            # Only add temperature for non-O-series models
+            if not self.model.startswith('openai/o'):
+                params["temperature"] = 0.3
+            
+            logger.debug(f"LLM parameters: {json.dumps({k: v for k, v in params.items() if k != 'messages'}, indent=2)}")
+            # litellm._turn_on_debug() 
             response = litellm.completion(**params)
             
-            return response.choices[0].message.content.strip()
+            result = response.choices[0].message.content.strip()
+            logger.debug(f"LLM response received, length: {len(result)} characters")
+            logger.debug(f"LLM response content: '{result[:100]}{'...' if len(result) > 100 else ''}'")
+            
+            return result
             
         except Exception as e:
             # Final fallback
-            logger = get_logger()
             logger.warning(f"Project summary LLM call failed: {e}")
-            return f"Active {project_data.get('primary_language', 'software')} project with {project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)} dependencies and {project_data.get('vulnerability_summary', {}).get('vulnerable_packages', 0)} security issues."
+            fallback = f"Active {project_data.get('primary_language', 'software')} project with {project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)} dependencies and {project_data.get('vulnerability_summary', {}).get('vulnerable_packages', 0)} security issues."
+            logger.debug(f"Using fallback summary: {fallback}")
+            return fallback
     
     def _prepare_llm_context(self, processed_data: Dict) -> Dict:
         """Prepare structured context data for LLM analysis."""
