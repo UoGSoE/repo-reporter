@@ -31,9 +31,9 @@ class LLMAnalyzer:
     def _select_model(self) -> str:
         """Select the best available LLM model."""
         if os.getenv('ANTHROPIC_API_KEY'):
-            return "claude-3-5-sonnet-20241022"
+            return "anthropic/claude-3-5-sonnet-20241022"
         elif os.getenv('OPENAI_API_KEY'):
-            return "gpt-4o"
+            return "openai/gpt-5-mini"
         else:
             raise ValueError("No LLM API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY")
     
@@ -130,12 +130,7 @@ Focus on business value, current status, and any concerns for management attenti
             params = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 150
             }
-            
-            # Only add temperature for non-O-series models
-            if not self.model.startswith('openai/o'):
-                params["temperature"] = 0.3
             
             response = litellm.completion(**params)
             
