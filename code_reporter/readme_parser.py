@@ -1,0 +1,217 @@
+"""README parsing functionality for extracting project descriptions."""
+
+import os
+import re
+from pathlib import Path
+from typing import Dict, Optional, List
+from .logger import get_logger
+
+
+class ReadmeParser:
+    """Parses README files to extract project descriptions and context."""
+    
+    # Common README file patterns (case-insensitive)
+    README_PATTERNS = [
+        'README.md',
+        'README.rst', 
+        'README.txt',
+        'README',
+        'readme.md',
+        'readme.rst',
+        'readme.txt',
+        'readme',
+        'Readme.md',
+        'Readme.rst',
+        'Readme.txt',
+        'Readme'
+    ]
+    
+    def __init__(self, max_lines: int = 20):
+        """
+        Initialize README parser.
+        
+        Args:
+            max_lines: Maximum number of lines to extract from README
+        """
+        self.max_lines = max_lines
+        self.logger = get_logger()
+    
+    def parse_repository(self, repo_path: Path) -> Dict:
+        """
+        Parse README file from repository root.
+        
+        Args:
+            repo_path: Path to repository root directory
+            
+        Returns:
+            Dictionary containing README info:
+            {
+                'found': bool,
+                'filename': str,
+                'content': str,
+                'lines_read': int
+            }
+        """
+        readme_file = self._find_readme_file(repo_path)
+        
+        if not readme_file:
+            self.logger.debug(f"No README file found in {repo_path}")
+            return {
+                'found': False,
+                'filename': None,
+                'content': '',
+                'lines_read': 0
+            }
+        
+        try:
+            content = self._extract_content(readme_file)
+            lines_read = len([line for line in content.split('\n') if line.strip()])
+            
+            self.logger.debug(f"README found: {readme_file.name}, extracted {lines_read} lines")
+            
+            return {
+                'found': True,
+                'filename': readme_file.name,
+                'content': content,
+                'lines_read': lines_read
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to read README {readme_file}: {e}")
+            return {
+                'found': False,
+                'filename': readme_file.name,
+                'content': '',
+                'lines_read': 0,
+                'error': str(e)
+            }
+    
+    def _find_readme_file(self, repo_path: Path) -> Optional[Path]:
+        """
+        Find README file in repository root.
+        
+        Args:
+            repo_path: Path to repository root
+            
+        Returns:
+            Path to README file or None if not found
+        """
+        if not repo_path.exists() or not repo_path.is_dir():
+            return None
+        
+        # Check each pattern in order of preference
+        for pattern in self.README_PATTERNS:
+            readme_path = repo_path / pattern
+            if readme_path.exists() and readme_path.is_file():
+                return readme_path
+        
+        return None
+    
+    def _extract_content(self, readme_path: Path) -> str:
+        """
+        Extract and clean content from README file.
+        
+        Args:
+            readme_path: Path to README file
+            
+        Returns:
+            Cleaned content string
+        """
+        # Try different encodings
+        encodings = ['utf-8', 'utf-8-sig', 'latin1', 'cp1252']
+        
+        content = None
+        for encoding in encodings:
+            try:
+                with open(readme_path, 'r', encoding=encoding) as f:
+                    content = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if content is None:
+            # Last resort: read as binary and decode errors
+            with open(readme_path, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        
+        # Extract first portion of content
+        lines = content.split('\n')
+        extracted_lines = []
+        sections_seen = 0
+        
+        for i, line in enumerate(lines):
+            if i >= self.max_lines:
+                break
+            
+            # Count section headers (## level)
+            if line.strip().startswith('## '):
+                sections_seen += 1
+                # Stop after seeing 2 section headers (let first section be included)
+                if sections_seen > 2:
+                    break
+            
+            # Stop at common section headers that indicate end of intro/description
+            lower_line = line.strip().lower()
+            if any(section in lower_line for section in [
+                'installation', 'getting started', 'requirements', 'prerequisites',
+                'development', 'contributing', 'license', 'table of contents',
+                'documentation', 'changelog', 'building', 'deployment'
+            ]) and (lower_line.startswith('#') or lower_line.endswith(':')):
+                break
+            
+            extracted_lines.append(line)
+        
+        # Join and clean the content
+        raw_content = '\n'.join(extracted_lines)
+        cleaned_content = self._clean_markdown(raw_content)
+        
+        return cleaned_content.strip()
+    
+    def _clean_markdown(self, content: str) -> str:
+        """
+        Clean markdown syntax while preserving meaning.
+        
+        Args:
+            content: Raw markdown content
+            
+        Returns:
+            Cleaned content with markdown syntax removed
+        """
+        # Remove title (single #) but keep content
+        content = re.sub(r'^#\s+(.+)$', r'\1', content, flags=re.MULTILINE)
+        
+        # Remove other headers but keep content
+        content = re.sub(r'^#{2,6}\s+(.+)$', r'\1', content, flags=re.MULTILINE)
+        
+        # Remove bold and italic formatting but keep text
+        content = re.sub(r'\*\*([^*]+)\*\*', r'\1', content)  # Bold
+        content = re.sub(r'\*([^*]+)\*', r'\1', content)      # Italic
+        content = re.sub(r'__([^_]+)__', r'\1', content)      # Bold
+        content = re.sub(r'_([^_]+)_', r'\1', content)        # Italic
+        
+        # Remove links but keep link text
+        content = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', content)
+        
+        # Remove images
+        content = re.sub(r'!\[[^\]]*\]\([^)]+\)', '', content)
+        
+        # Remove code blocks but keep inline code content  
+        content = re.sub(r'```[^`]*```', '', content, flags=re.DOTALL)
+        content = re.sub(r'`([^`]+)`', r'\1', content)
+        
+        # Remove horizontal rules
+        content = re.sub(r'^[-*_]{3,}$', '', content, flags=re.MULTILINE)
+        
+        # Remove badges (common in GitHub READMEs)
+        content = re.sub(r'\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)', '', content)
+        
+        # Clean up multiple empty lines
+        content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
+        
+        # Remove leading/trailing whitespace from lines
+        lines = [line.strip() for line in content.split('\n')]
+        
+        # Filter out empty lines and merge
+        meaningful_lines = [line for line in lines if line]
+        
+        return ' '.join(meaningful_lines)

@@ -213,6 +213,7 @@ class ReportGenerator:
             # Extract project data
             repo_info = result['repo_info']
             language_info = result['language_info']
+            readme_info = result.get('readme_info', {})
             github_stats = result.get('github_stats', {})
             dependency_info = result.get('dependency_info', {})
             sentry_stats = result.get('sentry_stats', {})
@@ -226,6 +227,7 @@ class ReportGenerator:
                 'url': repo_url,
                 'primary_language': language_info.get('primary_language'),
                 'language_details': language_info.get('languages', {}),
+                'readme_info': readme_info,
                 'github_metadata': github_stats.get('metadata', {}),
                 'github_issues': github_stats.get('issues', {}),
                 'github_commits': github_stats.get('commits', {}),
