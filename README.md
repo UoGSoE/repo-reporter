@@ -41,18 +41,27 @@ A comprehensive tool that analyzes GitHub repositories and generates detailed re
 
 ## Quick Start
 
-### 1. Installation
+### 1. Prerequisites
+
+Before installation, ensure you have:
+- **Python 3.13+**
+- **GitHub CLI**: Required for repository cloning (both public and private repos)
+  - Install from [cli.github.com](https://cli.github.com/) 
+  - Authenticate with `gh auth login`
+  - Verify with `gh auth status`
+
+### 2. Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/UoGSoE/repo-reporter.git
 cd repo-reporter
 
-# Install dependencies (requires Python 3.13+)
+# Install dependencies
 uv sync
 ```
 
-### 2. Configuration
+### 3. Configuration
 
 Create a `.env` file in the project root:
 
@@ -70,7 +79,7 @@ SENTRY_AUTH_TOKEN=your_sentry_auth_token_here
 SENTRY_ORG_SLUG=your_organization_slug
 ```
 
-### 3. Create Repository List
+### 4. Create Repository List
 
 Create a text file listing GitHub repositories to analyze (one per line):
 
@@ -81,7 +90,7 @@ https://github.com/gin-gonic/gin
 https://github.com/laravel/laravel
 ```
 
-### 4. Run Analysis
+### 5. Run Analysis
 
 ```bash
 # Basic usage
@@ -96,7 +105,7 @@ uv run main.py \
     --verbose
 ```
 
-### 5. View Reports
+### 6. View Reports
 
 Reports are generated in the `./reports` directory:
 - `executive_summary.html` - Cross-project overview for management

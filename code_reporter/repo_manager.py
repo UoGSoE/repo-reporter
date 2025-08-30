@@ -8,8 +8,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from contextlib import contextmanager
 
-import git
-from git import Repo
 from .logger import get_logger
 
 
@@ -88,15 +86,11 @@ class RepositoryManager:
                 check=True
             )
             
-            # Open the cloned repository with GitPython for metadata access
-            repo = Repo(temp_dir)
-            
             return RepoInfo(
                 url=repo_url,
                 local_path=temp_dir,
                 success=True,
-                error=None,
-                repo=repo
+                error=None
             )
             
         except Exception as e:
@@ -104,8 +98,7 @@ class RepositoryManager:
                 url=repo_url,
                 local_path=temp_dir,
                 success=False,
-                error=str(e),
-                repo=None
+                error=str(e)
             )
     
     
@@ -125,12 +118,11 @@ class RepositoryManager:
 class RepoInfo:
     """Information about a cloned repository."""
     
-    def __init__(self, url: str, local_path: Path, success: bool, error: Optional[str], repo: Optional[Repo]):
+    def __init__(self, url: str, local_path: Path, success: bool, error: Optional[str]):
         self.url = url
         self.local_path = local_path
         self.success = success
         self.error = error
-        self.repo = repo
         self._name = None
         self._owner = None
     
