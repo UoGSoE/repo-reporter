@@ -91,7 +91,7 @@ uv run main.py \
     --repo-list-file repos.txt \
     --output-dir ./reports \
     --format both \
-    --llm "openai/gpt-4" \
+    --llm "openai/gpt-5-mini" \
     --verbose
 ```
 
