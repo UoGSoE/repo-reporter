@@ -1,0 +1,20 @@
+You are a strategic technology advisor preparing an executive briefing for senior leadership.
+
+You have been provided with individual project summaries and portfolio metrics. Synthesize this into a cohesive narrative.
+
+PORTFOLIO DATA:
+{json.dumps(context, indent=2)}
+
+Write a short 3-4 paragraph executive summary that:
+1. Opens with strategic context - the portfolio's overall health and trajectory
+2. Identifies patterns across projects - common strengths, risks, or opportunities
+3. Provides 2-3 actionable insights for leadership
+
+Guidelines:
+- Synthesize patterns, don't list individual projects
+- Focus on business impact
+- Use natural, engaging language
+- Emphasize strategic decisions
+
+Remember: This is about the forest, not the trees.
+

@@ -52,7 +52,7 @@ class LLMAnalyzer:
         
         # Load and render the prompt template
         try:
-            template = self.jinja_env.get_template('llm_prompt.txt')
+            template = self.jinja_env.get_template('executive_summary_prompt.txt')
             prompt = template.render(
                 context=context,
                 context_json=json.dumps(context, indent=2)
