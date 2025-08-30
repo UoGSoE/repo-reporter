@@ -6,6 +6,7 @@ from typing import Dict, List, Any, Optional
 import litellm
 import json
 from jinja2 import Environment, FileSystemLoader
+from .logger import get_logger
 
 
 class LLMAnalyzer:
@@ -125,19 +126,25 @@ Technology: {language}
 Focus on business value, current status, and any concerns for management attention. Keep it under 100 words."""
 
         try:
-            response = litellm.completion(
-                model=self.model,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=150,
-                temperature=0.3
-            )
+            # Prepare parameters, handling O-series model limitations
+            params = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 150
+            }
+            
+            # Only add temperature for non-O-series models
+            if not self.model.startswith('openai/o'):
+                params["temperature"] = 0.3
+            
+            response = litellm.completion(**params)
             
             return response.choices[0].message.content.strip()
             
-        except Exception:
+        except Exception as e:
             # Final fallback
+            logger = get_logger()
+            logger.warning(f"Project summary LLM call failed: {e}")
             return f"Active {project_data.get('primary_language', 'software')} project with {project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)} dependencies and {project_data.get('vulnerability_summary', {}).get('vulnerable_packages', 0)} security issues."
     
     def _prepare_llm_context(self, processed_data: Dict) -> Dict:

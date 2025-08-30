@@ -137,20 +137,25 @@ class ReadmeParser:
         # Extract first portion of content
         lines = content.split('\n')
         extracted_lines = []
+        sections_seen = 0
         
         for i, line in enumerate(lines):
             if i >= self.max_lines:
                 break
-                
-            # Stop at major section breaks (markdown headers starting with ##)
-            if line.strip().startswith('## '):
-                break
             
-            # Stop at common section headers that indicate end of intro
+            # Count section headers (## level)
+            if line.strip().startswith('## '):
+                sections_seen += 1
+                # Stop after seeing 2 section headers (let first section be included)
+                if sections_seen > 2:
+                    break
+            
+            # Stop at common section headers that indicate end of intro/description
             lower_line = line.strip().lower()
             if any(section in lower_line for section in [
-                'installation', 'getting started', 'usage', 'api',
-                'development', 'contributing', 'license', 'table of contents'
+                'installation', 'getting started', 'requirements', 'prerequisites',
+                'development', 'contributing', 'license', 'table of contents',
+                'documentation', 'changelog', 'building', 'deployment'
             ]) and (lower_line.startswith('#') or lower_line.endswith(':')):
                 break
             
