@@ -1,6 +1,7 @@
 """HTML report generation functionality."""
 
 import json
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any
@@ -90,6 +91,23 @@ class ReportGenerator:
         self.jinja_env.filters['markdown'] = markdown_filter
         self.jinja_env.filters['number_format'] = number_format_filter
         self.jinja_env.filters['currency_format'] = currency_format_filter
+        
+        # Add custom timeline formatting filter (months -> Xm or X(.5)y, rounded up)
+        def timeline_format_filter(value):
+            try:
+                months = float(value or 0)
+            except (ValueError, TypeError):
+                return "0m"
+            if months < 12:
+                return f"{int(math.ceil(months))}m"
+            years = months / 12.0
+            # round up to nearest half-year
+            half_up = math.ceil(years * 2) / 2.0
+            if half_up.is_integer():
+                return f"{int(half_up)}y"
+            return f"{half_up}y"
+
+        self.jinja_env.filters['timeline_format'] = timeline_format_filter
         
         # Create templates if they don't exist
         self._ensure_templates()
