@@ -266,7 +266,10 @@ Focus on business value, current status, and any concerns for management attenti
             'business_metrics': {
                 'total_stars': summary['activity_metrics']['total_stars'],
                 'total_forks': summary['activity_metrics']['total_forks'],
-                'dependency_count': summary['total_dependencies'],
+                # Prefer unique dependency count to avoid inflating footprint
+                'unique_dependency_count': summary.get('unique_dependency_count', len(summary.get('unique_dependencies', []))),
+                # Also include total usages across projects for context
+                'total_dependency_usages': summary['total_dependencies'],
                 'has_error_monitoring': summary['sentry_metrics']['projects_with_sentry'] > 0,
                 'monitored_projects': summary['sentry_metrics']['projects_with_sentry']
             }

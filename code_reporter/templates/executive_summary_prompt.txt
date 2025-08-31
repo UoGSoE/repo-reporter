@@ -29,3 +29,4 @@ Formatting requirements (important):
 - Use clear section headings: "## Overview", "## Portfolio Themes", "## Recommendations".
 - Keep paragraphs short; use bullet points for recommendations.
 - Use bold for key metrics and emphasis where helpful.
+ - When referencing portfolio dependency footprint, use the unique dependency count (fields: `unique_dependency_count` or `unique_dependencies`) rather than total usage (`total_dependency_usages`), unless explicitly contrasting the two.
