@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 import requests
+import time
 import tomli
 import yaml
 
@@ -397,34 +398,105 @@ class DependencyAnalyzer:
         return packages
     
     def _check_vulnerabilities(self, packages: List[Dict]) -> List[Dict]:
-        """Check packages for known vulnerabilities using OSV API."""
-        vulnerabilities = []
-        
-        for package in packages:
-            if package['version'] == 'unknown':
+        """Check packages for known vulnerabilities using OSV batch API with fallback."""
+        logger = get_logger()
+        ecosystem_map = {
+            'python': 'PyPI',
+            'php': 'Packagist',
+            'golang': 'Go'
+        }
+
+        # Build unique queries and index map
+        queries = []
+        index_to_pkg = []
+        seen = set()
+        for pkg in packages:
+            if pkg['version'] == 'unknown':
                 continue
-            
-            # Create cache key
-            cache_key = f"{package['language']}:{package['name']}:{package['version']}"
-            
+            eco = ecosystem_map.get(pkg['language'])
+            if not eco:
+                continue
+            key = (pkg['language'], pkg['name'], pkg['version'])
+            if key in seen:
+                continue
+            seen.add(key)
+            # Cache hit shortcut
+            cache_key = f"{key[0]}:{key[1]}:{key[2]}"
             if cache_key in self._cve_cache:
-                vulns = self._cve_cache[cache_key]
-            else:
-                vulns = self._query_osv_api(package)
+                continue  # will be added from cache later
+            queries.append({
+                "package": {"name": pkg['name'], "ecosystem": eco},
+                "version": pkg['version']
+            })
+            index_to_pkg.append(key)
+
+        # Call batch endpoint in chunks
+        batch_vulns_map = {}
+        url = f"{self.osv_api_base}/querybatch"
+        chunk_size = 100
+        for i in range(0, len(queries), chunk_size):
+            chunk = queries[i:i+chunk_size]
+            attempt = 0
+            while attempt < 3:
+                try:
+                    resp = self.session.post(url, json={"queries": chunk}, timeout=20)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        results = data.get('results', [])
+                        for j, res in enumerate(results):
+                            idx = i + j
+                            if idx >= len(index_to_pkg):
+                                continue
+                            key = index_to_pkg[idx]
+                            vulns = res.get('vulns', []) or []
+                            # Normalize vuln records similar to single query
+                            norm = [
+                                {
+                                    'id': v.get('id'),
+                                    'summary': v.get('summary', 'No summary available'),
+                                    'severity': self._extract_severity(v),
+                                    'published': v.get('published'),
+                                    'modified': v.get('modified')
+                                }
+                                for v in vulns
+                            ]
+                            self._cve_cache[f"{key[0]}:{key[1]}:{key[2]}"] = norm
+                            batch_vulns_map[key] = norm
+                        break
+                    else:
+                        attempt += 1
+                        time.sleep(0.5 * (attempt))
+                except Exception as e:
+                    attempt += 1
+                    if attempt >= 3:
+                        logger.warning(f"OSV batch query failed after retries: {e}")
+                    else:
+                        time.sleep(0.5 * (attempt))
+
+        # Aggregate all vulnerabilities from cache/batch per input package (preserve dev flag)
+        vulnerabilities: List[Dict] = []
+        for pkg in packages:
+            if pkg['version'] == 'unknown':
+                continue
+            eco = ecosystem_map.get(pkg['language'])
+            if not eco:
+                continue
+            cache_key = f"{pkg['language']}:{pkg['name']}:{pkg['version']}"
+            vulns = self._cve_cache.get(cache_key)
+            if vulns is None:
+                # Fallback to single query if not cached from batch
+                vulns = self._query_osv_api(pkg)
                 self._cve_cache[cache_key] = vulns
-            
             if vulns:
-                vulnerabilities.extend([
-                    {
-                        'package': package['name'],
-                        'version': package['version'],
-                        'language': package['language'],
-                        'vulnerability': vuln,
-                        'dev_dependency': package['dev']
-                    }
-                    for vuln in vulns
-                ])
-        
+                for v in vulns:
+                    vulnerabilities.append({
+                        'package': pkg['name'],
+                        'version': pkg['version'],
+                        'language': pkg['language'],
+                        'vulnerability': v,
+                        'dev_dependency': pkg['dev']
+                    })
+
         return vulnerabilities
     
     def _query_osv_api(self, package: Dict) -> List[Dict]:
