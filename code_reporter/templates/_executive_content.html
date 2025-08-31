@@ -329,7 +329,21 @@
                 </div>
                 {% endif %}
                 
-                {% if charts.security_overview %}
+                {% if charts.portfolio_value %}
+                <div class="glass-card rounded-xl p-6 print-avoid-break">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <div class="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 1C6.477 1 2 5.477 2 11s4.477 10 10 10 10-4.477 10-10S17.523 1 12 1zm1 5v2h3a1 1 0 010 2h-3v2h3a1 1 0 010 2h-3v2a1 1 0 11-2 0v-2H8a1 1 0 010-2h3V10H8a1 1 0 010-2h3V6a1 1 0 112 0z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-accent-800">Portfolio Value</h3>
+                    </div>
+                    <div class="min-h-[400px] bg-slate-50 rounded-lg p-4">
+                        {{ charts.portfolio_value | safe }}
+                    </div>
+                </div>
+                {% elif charts.security_overview %}
                 <div class="glass-card rounded-xl p-6 print-avoid-break">
                     <div class="flex items-center space-x-3 mb-6">
                         <div class="w-8 h-8 bg-{% if risk_metrics.vulnerable_projects > 0 %}danger-600{% else %}success-600{% endif %} rounded-lg flex items-center justify-center">

@@ -377,8 +377,43 @@ class ReportGenerator:
         charts = {}
         summary = processed_data['summary']
         
-        # Language distribution pie chart
-        if summary['languages']:
+        # Technology distribution chart
+        # Prefer SCC language breakdown (Code lines by language) for a more granular view.
+        # Fallback to primary-language counts if SCC isn't available.
+        scc_lang_totals: Dict[str, int] = {}
+        for project in processed_data['projects'].values():
+            for lang in project.get('scc_language_summary', []) or []:
+                # Use Code lines as a better proxy for real code volume
+                name = lang.get('Name')
+                code_lines = int(lang.get('Code', 0) or 0)
+                if name:
+                    scc_lang_totals[name] = scc_lang_totals.get(name, 0) + code_lines
+
+        if scc_lang_totals:
+            # Sort and take top languages for readability
+            sorted_items = sorted(scc_lang_totals.items(), key=lambda x: x[1], reverse=True)
+            names = [k for k, _ in sorted_items[:15]]
+            values = [int(v) for _, v in sorted_items[:15]]
+
+            fig_lang = go.Figure(data=[go.Bar(
+                y=names,
+                x=values,
+                orientation='h',
+                marker_color='#6366F1',
+                hovertemplate='<b>%{y}</b><br>Code lines: %{x:,}<extra></extra>'
+            )])
+            fig_lang.update_layout(
+                title="Technology Distribution (SCC Code Lines)",
+                xaxis_title="Code Lines",
+                yaxis_title="",
+                height=max(400, len(names) * 24 + 120),
+                margin=dict(l=120, r=40, t=60, b=60),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
+            )
+            charts['language_distribution'] = fig_lang.to_html(include_plotlyjs=False, div_id="lang-chart")
+        elif summary['languages']:
+            # Fallback: primary languages distribution
             fig_lang = px.pie(
                 values=list(summary['languages'].values()),
                 names=list(summary['languages'].keys()),
@@ -450,18 +485,48 @@ class ReportGenerator:
             )
             charts['dependency_license_distribution'] = fig_dep_licenses.to_html(include_plotlyjs=False, div_id="dep-license-chart")
         
-        # Security overview chart
-        vuln_projects = sum(1 for p in processed_data['projects'].values() 
-                           if p.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0)
-        safe_projects = summary['successful_analyses'] - vuln_projects
-        
-        fig_security = go.Figure(data=[
-            go.Bar(x=['Projects with Vulnerabilities', 'Secure Projects'], 
-                   y=[vuln_projects, safe_projects],
-                   marker_color=['red', 'green'])
-        ])
-        fig_security.update_layout(title="Security Overview")
-        charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
+        # Portfolio value chart (COCOMO estimated cost by project)
+        value_labels: List[str] = []
+        value_values: List[float] = []
+        for project in processed_data['projects'].values():
+            cost = float(project.get('scc_estimated_cost', 0.0) or 0.0)
+            if cost > 0 and project.get('success'):
+                value_labels.append(project.get('name', 'Unknown'))
+                value_values.append(cost)
+
+        if value_values:
+            # Limit number of slices for readability; group the rest under "Other"
+            items = list(zip(value_labels, value_values))
+            items.sort(key=lambda x: x[1], reverse=True)
+            top_n = 12
+            top_items = items[:top_n]
+            other_total = sum(v for _, v in items[top_n:])
+            labels_plot = [lbl for lbl, _ in top_items]
+            values_plot = [val for _, val in top_items]
+            if other_total > 0:
+                labels_plot.append('Other')
+                values_plot.append(other_total)
+
+            fig_value = go.Figure(data=[go.Pie(
+                labels=labels_plot,
+                values=values_plot,
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Estimated Value: $%{value:,.0f}<extra></extra>'
+            )])
+            fig_value.update_layout(title="Portfolio Value by Project (COCOMO)")
+            charts['portfolio_value'] = fig_value.to_html(include_plotlyjs=False, div_id="portfolio-value-chart")
+        else:
+            # Fallback: retain the simple security overview
+            vuln_projects = sum(1 for p in processed_data['projects'].values() 
+                               if p.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0)
+            safe_projects = summary['successful_analyses'] - vuln_projects
+            fig_security = go.Figure(data=[
+                go.Bar(x=['Projects with Vulnerabilities', 'Secure Projects'], 
+                       y=[vuln_projects, safe_projects],
+                       marker_color=['red', 'green'])
+            ])
+            fig_security.update_layout(title="Security Overview")
+            charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
         
         # Development Activity Dashboard
         projects = list(processed_data['projects'].values())
@@ -1036,7 +1101,11 @@ class ReportGenerator:
             </div>
             {% endif %}
             
-            {% if charts.security_overview %}
+            {% if charts.portfolio_value %}
+            <div class="chart-container">
+                {{ charts.portfolio_value | safe }}
+            </div>
+            {% elif charts.security_overview %}
             <div class="chart-container">
                 {{ charts.security_overview | safe }}
             </div>
