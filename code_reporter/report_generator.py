@@ -2,6 +2,7 @@
 
 import json
 import math
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any
@@ -178,6 +179,70 @@ class ReportGenerator:
         report_paths['combined_report'] = str(combined_path)
         
         return report_paths
+
+    def _simplify_license_name(self, license_name: str) -> str:
+        """Map raw license strings to broad categories for manager-friendly charts.
+
+        - Collapses variants (e.g., BSD-2/3 -> BSD, LGPL versions -> LGPL).
+        - Attempts to detect SPDX-like expressions and multi-license strings; if
+          multiple distinct families are present, returns 'Mixed'.
+        """
+        if not license_name:
+            return 'Unknown'
+
+        text = str(license_name)
+        lower = text.lower()
+
+        # If the string clearly contains multiple licenses/operators, treat as mixed
+        if any(sep in lower for sep in ['/', ' or ', ' and ', '||', ',', ' with ', '(', ')']):
+            parts = re.split(r"\bor\b|\band\b|\||/|,|\(|\)|\bwith\b", lower)
+            families: set[str] = set()
+            for p in parts:
+                p = p.strip()
+                if not p:
+                    continue
+                families.add(self._simplify_license_name_single(p))
+            families.discard('Other')
+            families.discard('Unknown')
+            return next(iter(families)) if len(families) == 1 else 'Mixed'
+
+        return self._simplify_license_name_single(lower)
+
+    def _simplify_license_name_single(self, lower_name: str) -> str:
+        """Simplify a single license token (expects lowercase)."""
+        ln = lower_name.strip()
+        if not ln:
+            return 'Unknown'
+        # Check more specific identifiers before generic ones
+        if 'mit' in ln or 'isc' in ln:
+            return 'MIT'
+        if 'apache' in ln:
+            return 'Apache'
+        if 'bsd' in ln:
+            return 'BSD'
+        if 'lgpl' in ln:
+            return 'LGPL'
+        if 'agpl' in ln:
+            return 'AGPL'
+        if 'gpl' in ln:
+            return 'GPL'
+        if 'mozilla' in ln or 'mpl' in ln:
+            return 'MPL'
+        if 'unlicense' in ln or 'public domain' in ln:
+            return 'Public Domain'
+        if 'proprietary' in ln or 'commercial' in ln:
+            return 'Proprietary'
+        if 'unknown' in ln:
+            return 'Unknown'
+        return 'Other'
+
+    def _simplify_license_distribution(self, distribution: Dict[str, int]) -> Dict[str, int]:
+        """Aggregate a license distribution dict into simplified families."""
+        simplified: Dict[str, int] = {}
+        for raw, count in (distribution or {}).items():
+            key = self._simplify_license_name(raw)
+            simplified[key] = simplified.get(key, 0) + int(count or 0)
+        return simplified
     
     def _process_analysis_data(self, analysis_results: Dict) -> Dict:
         """Process raw analysis results into structured data for reporting."""
@@ -452,34 +517,8 @@ class ReportGenerator:
             logger = get_logger()
             logger.debug(f"Executive summary chart data: {summary['dependency_license_distribution']}")
             
-            # Simplify license names for executive summary
-            def simplify_license_name(license_name):
-                """Simplify license names for executive-friendly display"""
-                license_lower = license_name.lower()
-                if 'mit' in license_lower:
-                    return 'MIT'
-                elif 'apache' in license_lower:
-                    return 'Apache'
-                elif 'bsd' in license_lower and 'gpl' in license_lower:
-                    return 'Mixed'
-                elif 'bsd' in license_lower:
-                    return 'BSD'
-                elif 'gpl' in license_lower:
-                    return 'GPL'
-                elif 'lgpl' in license_lower:
-                    return 'LGPL'
-                elif 'mozilla' in license_lower or 'mpl' in license_lower:
-                    return 'Mozilla'
-                elif 'unlicense' in license_lower:
-                    return 'Public Domain'
-                else:
-                    return 'Other'
-            
             # Group licenses by simplified names and aggregate counts
-            simplified_licenses = {}
-            for license_name, count in summary['dependency_license_distribution'].items():
-                simplified_name = simplify_license_name(license_name)
-                simplified_licenses[simplified_name] = simplified_licenses.get(simplified_name, 0) + count
+            simplified_licenses = self._simplify_license_distribution(summary['dependency_license_distribution'])
             
             # Ensure values are proper native Python integers for Plotly
             exec_chart_values = [int(v) if v is not None else 0 for v in simplified_licenses.values()]
@@ -675,7 +714,10 @@ class ReportGenerator:
         dep_licenses = project_data.get('dependency_licenses', {})
         if dep_licenses:
             logger = get_logger()
-            logger.debug(f"Chart data for {project_data['name']}: {dep_licenses}")
+            logger.debug(f"Chart data (raw) for {project_data['name']}: {dep_licenses}")
+            # Simplify to broad license families for easier reading
+            dep_licenses = self._simplify_license_distribution(dep_licenses)
+            logger.debug(f"Chart data (simplified) for {project_data['name']}: {dep_licenses}")
             # Ensure values are proper native Python integers for Plotly
             chart_values = [int(v) if v is not None else 0 for v in dep_licenses.values()]
             chart_names = list(dep_licenses.keys())
@@ -767,7 +809,10 @@ class ReportGenerator:
                 project_dep_license_chart = None
                 dep_licenses = project_data.get('dependency_licenses', {})
                 if dep_licenses:
-                    logger.debug(f"Chart data for {project_data['name']}: {dep_licenses}")
+                    logger.debug(f"Chart data (raw) for {project_data['name']}: {dep_licenses}")
+                    # Simplify to broad license families for easier reading
+                    dep_licenses = self._simplify_license_distribution(dep_licenses)
+                    logger.debug(f"Chart data (simplified) for {project_data['name']}: {dep_licenses}")
                     # Ensure values are proper native Python integers for Plotly
                     chart_values = [int(v) if v is not None else 0 for v in dep_licenses.values()]
                     chart_names = list(dep_licenses.keys())
