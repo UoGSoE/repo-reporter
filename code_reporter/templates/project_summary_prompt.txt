@@ -22,3 +22,11 @@ Write a 2-3 sentence executive summary that covers:
 - Key concerns or highlights for management attention
 
 Focus on business impact, risk assessment, and resource implications. Keep it under 100 words and suitable for a manager who needs the key points quickly. Use the README content to explain the project's purpose in business terms, then connect the technical metrics to business outcomes.
+
+Formatting requirements (important):
+- Output GitHub-Flavored Markdown only (no HTML, no code fences).
+- Use a compact structure with bolded labels, for example:
+  - **Overview:** one short sentence on purpose and value
+  - **Status:** one short sentence on activity/engagement
+  - **Risks/Actions:** one short sentence with key risk or next step
+- Avoid tables; keep to 40–100 words total.

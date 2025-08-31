@@ -24,3 +24,8 @@ Guidelines:
 {% endif %}
 Remember: This is about the forest, not the trees.
 
+Formatting requirements (important):
+- Output GitHub-Flavored Markdown only (no HTML, no code fences).
+- Use clear section headings: "## Overview", "## Portfolio Themes", "## Recommendations".
+- Keep paragraphs short; use bullet points for recommendations.
+- Use bold for key metrics and emphasis where helpful.

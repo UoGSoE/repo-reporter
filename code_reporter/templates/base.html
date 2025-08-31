@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Code Analysis Report{% endblock %}</title>
     
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS CDN with Typography plugin for Markdown styling -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     
     <!-- Configure Tailwind with professional color palette -->
     <script>
@@ -173,6 +173,29 @@
             height: 100%;
             background: linear-gradient(180deg, #0ea5e9, #3b82f6);
             opacity: 0.6;
+        }
+
+        /* Improve readability of Markdown-rendered content */
+        .prose h1, .prose h2, .prose h3, .prose h4 {
+            color: #0369a1; /* primary-700 */
+        }
+        .prose h2 {
+            margin-top: 1.25rem;
+            padding-left: 0.5rem;
+            border-left: 4px solid #0ea5e9; /* primary-500 */
+        }
+        .prose h3 {
+            margin-top: 1rem;
+            padding-left: 0.5rem;
+            border-left: 3px solid #38bdf8; /* primary-400 */
+        }
+        .prose p {
+            margin-top: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .prose ul, .prose ol {
+            margin-top: 0.5rem;
+            margin-bottom: 0.75rem;
         }
     </style>
     
