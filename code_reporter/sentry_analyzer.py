@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Any
 from urllib.parse import urlparse, parse_qs
 
 import requests
-import click
+from .logger import get_logger
 
 
 class SentryAnalyzer:
@@ -27,7 +27,8 @@ class SentryAnalyzer:
         self.base_url = "https://sentry.io/api/0"
         
         if not self.auth_token:
-            click.echo("⚠️ Sentry analysis disabled: SENTRY_AUTH_TOKEN not provided")
+            logger = get_logger()
+            logger.info("Sentry analysis disabled: SENTRY_AUTH_TOKEN not provided")
             self.enabled = False
         else:
             self.enabled = True

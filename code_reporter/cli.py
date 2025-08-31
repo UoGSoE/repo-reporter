@@ -45,7 +45,7 @@ from .logger import init_logger, get_logger
 @click.option(
     '--llm',
     default='openai/gpt-5-mini',
-    help='LLM model to use for executive summary generation (default: openai/gpt-5-minie)'
+    help='LLM model to use for executive summary generation (default: openai/gpt-5-mini)'
 )
 def main(
     repo_list_file: Path,
@@ -253,7 +253,8 @@ def main(
                     }
     
     except KeyboardInterrupt:
-        click.echo("\n⚠️ Analysis interrupted by user")
+        logger = get_logger()
+        logger.warning("Analysis interrupted by user")
         return
     
     # Summary
@@ -319,9 +320,10 @@ def validate_config(verbose: bool = False) -> dict:
         logger.debug(f"  Sentry Org Slug: {'✅' if config['sentry']['org_slug'] else '❌'}")
     
     if errors:
-        print("❌ Configuration errors:", file=sys.stderr)
+        logger = get_logger()
+        logger.error("Configuration errors:")
         for error in errors:
-            print(f"  - {error}", file=sys.stderr)
+            logger.error(f"  - {error}")
         return None
     
     return config
@@ -337,7 +339,8 @@ def read_repo_list(file_path: Path) -> list[str]:
             if line and not line.startswith('#'):
                 # Basic URL validation
                 if not (line.startswith('https://github.com/') or line.startswith('git@github.com:')):
-                    print(f"⚠️ Warning: Line {line_num} doesn't look like a GitHub URL: {line}", file=sys.stderr)
+                    logger = get_logger()
+                    logger.warning(f"Line {line_num} doesn't look like a GitHub URL: {line}")
                 repos.append(line)
     
     return repos

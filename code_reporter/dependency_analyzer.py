@@ -607,7 +607,7 @@ class DependencyAnalyzer:
             if not vendor_path.exists():
                 logger.debug("Installing composer dependencies")
                 install_result = subprocess.run(
-                    ['composer', 'install', '--no-dev', '--quiet'],
+                    ['composer', 'install', '--no-dev', '--no-scripts', '--quiet'],
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
@@ -662,7 +662,7 @@ class DependencyAnalyzer:
                                 'raw_license': 'No license in composer output',
                                 'source': 'composer_no_license'
                             }
-                            print(f"      ❓ {name}: No license info")
+                            logger.debug(f"No license info for {name}")
                     
                     logger.debug(f"Composer licenses parsed: {len(licenses)} packages")
                     
@@ -671,16 +671,16 @@ class DependencyAnalyzer:
                     logger.debug(f"Raw output: {result.stdout[:200]}...")
                     
             else:
-                print(f"   ❌ Composer licenses command failed (exit code {result.returncode})")
+                logger.warning(f"Composer licenses command failed (exit code {result.returncode})")
                 if result.stderr:
                     logger.debug(f"Error: {result.stderr[:200]}...")
                     
         except subprocess.TimeoutExpired:
-            print(f"   ⏰ Composer licenses command timed out")
+            logger.warning("Composer licenses command timed out")
         except FileNotFoundError:
-            print(f"   ❌ Composer command not found - falling back to API")
+            logger.warning("Composer command not found - falling back to API")
         except Exception as e:
-            print(f"   ❌ Composer licenses error: {e}")
+            logger.warning(f"Composer licenses error: {e}")
         
         return licenses
     
@@ -730,8 +730,9 @@ class DependencyAnalyzer:
                 license_from_api = info.get('license')
                 classifiers = info.get('classifiers', [])
                 license_classifiers = [c for c in classifiers if c.startswith('License ::')]
-                print(f"      🔎 PyPI response - license field: {repr(license_from_api)}")
-                print(f"      🔎 PyPI response - license classifiers: {license_classifiers}")
+                logger = get_logger()
+                logger.debug(f"PyPI response - license field: {repr(license_from_api)}")
+                logger.debug(f"PyPI response - license classifiers: {license_classifiers}")
                 
                 # Try license field first
                 license_text = info.get('license') or ''
@@ -780,12 +781,13 @@ class DependencyAnalyzer:
                     }
                 
                 # Debug: Show full info for packages with no license
-                print(f"      🔎 No license found for {package_name}. Available info keys: {list(info.keys())}")
+                logger = get_logger()
+                logger.debug(f"No license found for {package_name}. Available info keys: {list(info.keys())}")
                 license_related_fields = {k: v for k, v in info.items() if 'license' in k.lower()}
-                print(f"      🔎 License-related fields: {license_related_fields}")
+                logger.debug(f"License-related fields: {license_related_fields}")
                 if 'classifiers' in info:
                     all_classifiers = info.get('classifiers', [])
-                    print(f"      🔎 All classifiers: {[c for c in all_classifiers if 'license' in c.lower() or 'License' in c]}")
+                    logger.debug(f"All classifiers: {[c for c in all_classifiers if 'license' in c.lower() or 'License' in c]}")
                 
                 return {
                     'license': 'Unknown',
@@ -794,7 +796,8 @@ class DependencyAnalyzer:
                 }
         
         except Exception as e:
-            print(f"      ⚠️ PyPI API error for {package_name}: {str(e)}")
+            logger = get_logger()
+            logger.warning(f"PyPI API error for {package_name}: {str(e)}")
             return {
                 'license': 'Unknown',
                 'raw_license': f'API Error: {str(e)}',
@@ -834,7 +837,8 @@ class DependencyAnalyzer:
                 }
         
         except Exception as e:
-            print(f"      ⚠️ Packagist API error for {package_name}: {str(e)}")
+            logger = get_logger()
+            logger.warning(f"Packagist API error for {package_name}: {str(e)}")
             return {
                 'license': 'Unknown',
                 'raw_license': f'API Error: {str(e)}',
@@ -868,7 +872,8 @@ class DependencyAnalyzer:
             }
         
         except Exception as e:
-            print(f"      ⚠️ Go package API error for {package_name}: {str(e)}")
+            logger = get_logger()
+            logger.warning(f"Go package API error for {package_name}: {str(e)}")
             return {
                 'license': 'Unknown',
                 'raw_license': f'API Error: {str(e)}',

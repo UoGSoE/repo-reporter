@@ -123,7 +123,7 @@ uv run main.py --help
 | `--repo-list-file` | Path to file with repository URLs | **Required** |
 | `--output-dir` | Output directory for reports | `./reports` |
 | `--format` | Report format: `html`, `pdf`, or `both` | `both` |
-| `--llm` | LLM model for summaries | `openai/o4-mini` |
+| `--llm` | LLM model for summaries | `openai/gpt-5-mini` |
 | `--verbose` | Enable detailed logging | `false` |
 | `--env-file` | Custom .env file path | `.env` |
 
@@ -322,4 +322,3 @@ Set up automated monthly reporting with GitHub Actions! The workflow runs on the
 ## Support
 
 For issues and feature requests, please use the GitHub issue tracker.
-

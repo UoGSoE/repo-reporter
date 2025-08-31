@@ -18,7 +18,7 @@ from .logger import get_logger
 class ReportGenerator:
     """Generates HTML reports from analysis results."""
     
-    def __init__(self, output_dir: Path, llm_model: str = "openai/o4-mini"):
+    def __init__(self, output_dir: Path, llm_model: str = "openai/gpt-5-mini"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         

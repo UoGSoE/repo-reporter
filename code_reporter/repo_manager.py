@@ -28,7 +28,8 @@ class RepositoryManager:
                 ['gh', '--version'],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=30
             )
         except FileNotFoundError:
             raise RuntimeError("gh CLI not found. Please install GitHub CLI.")
@@ -83,7 +84,8 @@ class RepositoryManager:
                 ['gh', 'repo', 'clone', repo_url, str(temp_dir)],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=30
             )
             
             return RepoInfo(
