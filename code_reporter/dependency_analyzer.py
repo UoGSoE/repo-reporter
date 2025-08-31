@@ -65,13 +65,21 @@ class DependencyAnalyzer:
         # Check for vulnerabilities
         all_packages = self._flatten_dependencies(result['dependencies'])
         result['vulnerabilities'] = self._check_vulnerabilities(all_packages)
-        
+
+        # Compute unique non-dev vulnerable packages for clearer managerial reporting
+        unique_non_dev_packages = set()
+        for finding in result['vulnerabilities']:
+            if not finding.get('dev_dependency'):
+                unique_non_dev_packages.add((finding.get('language'), finding.get('package')))
+
+        # Update headline summary to exclude dev deps and use unique package count
+        result['summary']['vulnerable_packages'] = len(unique_non_dev_packages)
+
         # Collect license information for dependencies
         result['licenses'] = self._collect_dependency_licenses(all_packages, repo_path, language_info)
         
         # Update summary
         result['summary']['total_dependencies'] = len(all_packages)
-        result['summary']['vulnerable_packages'] = len(result['vulnerabilities'])
         
         return result
     
