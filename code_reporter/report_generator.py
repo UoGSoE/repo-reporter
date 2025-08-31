@@ -309,7 +309,8 @@ class ReportGenerator:
         # Dependency and security metrics
         vuln_summary = project_data.get('vulnerability_summary', {})
         summary['total_dependencies'] += vuln_summary.get('total_dependencies', 0)
-        summary['total_vulnerabilities'] += vuln_summary.get('vulnerable_packages', 0)
+        # Track total production vulnerabilities (findings) across portfolio
+        summary['total_vulnerabilities'] += len(project_data.get('vulnerabilities_prod', []) )
         
         # Track unique dependencies (simple deduplication)
         dependencies = project_data.get('dependencies', {})

@@ -55,7 +55,7 @@
                         <span class="text-4xl font-bold text-{% if risk_metrics.vulnerable_projects > 0 %}danger-700{% else %}success-700{% endif %}">{{ risk_metrics.vulnerable_projects }}</span>
                     </div>
                     <p class="text-{% if risk_metrics.vulnerable_projects > 0 %}danger-600{% else %}success-600{% endif %} font-medium">Vulnerable Projects</p>
-                    <p class="text-accent-500 text-sm mt-1">{{ risk_metrics.risk_score }}% overall risk score</p>
+                    <p class="text-accent-500 text-sm mt-1">Total production vulnerabilities: {{ risk_metrics.total_vulnerabilities | default(0) }}</p>
                 </div>
                 
                 <!-- Sentry Coverage -->
