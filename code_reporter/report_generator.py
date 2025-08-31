@@ -1,6 +1,7 @@
 """HTML report generation functionality."""
 
 import json
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any
@@ -12,13 +13,14 @@ from jinja2 import Environment, FileSystemLoader, Template
 import pandas as pd
 import markdown
 from .llm_analyzer import LLMAnalyzer
+from .config import load_config
 from .logger import get_logger
 
 
 class ReportGenerator:
     """Generates HTML reports from analysis results."""
     
-    def __init__(self, output_dir: Path, llm_model: str = "openai/o4-mini"):
+    def __init__(self, output_dir: Path, llm_model: str = "openai/gpt-5-mini"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -90,8 +92,28 @@ class ReportGenerator:
         self.jinja_env.filters['number_format'] = number_format_filter
         self.jinja_env.filters['currency_format'] = currency_format_filter
         
+        # Add custom timeline formatting filter (months -> Xm or X(.5)y, rounded up)
+        def timeline_format_filter(value):
+            try:
+                months = float(value or 0)
+            except (ValueError, TypeError):
+                return "0m"
+            if months < 12:
+                return f"{int(math.ceil(months))}m"
+            years = months / 12.0
+            # round up to nearest half-year
+            half_up = math.ceil(years * 2) / 2.0
+            if half_up.is_integer():
+                return f"{int(half_up)}y"
+            return f"{half_up}y"
+
+        self.jinja_env.filters['timeline_format'] = timeline_format_filter
+        
         # Create templates if they don't exist
         self._ensure_templates()
+
+        # Load runtime config
+        self.config = load_config()
     
     def generate_reports(self, analysis_results: Dict, format_type: str = 'html') -> Dict:
         """
@@ -245,6 +267,11 @@ class ReportGenerator:
                 'scc_estimated_people': scc_stats.get('estimated_people', 0.0),
                 'scc_enabled': scc_stats.get('success', False)
             }
+
+            # Split vulnerabilities into production vs dev-only for clearer rendering
+            vulns_all = project_data['vulnerabilities'] or []
+            project_data['vulnerabilities_prod'] = [v for v in vulns_all if not v.get('dev_dependency')]
+            project_data['vulnerabilities_dev'] = [v for v in vulns_all if v.get('dev_dependency')]
             
             processed['projects'][repo_url] = project_data
             
@@ -304,7 +331,8 @@ class ReportGenerator:
         # Dependency and security metrics
         vuln_summary = project_data.get('vulnerability_summary', {})
         summary['total_dependencies'] += vuln_summary.get('total_dependencies', 0)
-        summary['total_vulnerabilities'] += vuln_summary.get('vulnerable_packages', 0)
+        # Track total production vulnerabilities (findings) across portfolio
+        summary['total_vulnerabilities'] += len(project_data.get('vulnerabilities_prod', []) )
         
         # Track unique dependencies (simple deduplication)
         dependencies = project_data.get('dependencies', {})
@@ -371,13 +399,52 @@ class ReportGenerator:
         charts = {}
         summary = processed_data['summary']
         
-        # Language distribution pie chart
-        if summary['languages']:
+        # Technology distribution chart
+        # Prefer SCC language breakdown (Code lines by language) for a more granular view.
+        # Fallback to primary-language counts if SCC isn't available.
+        scc_lang_totals: Dict[str, int] = {}
+        for project in processed_data['projects'].values():
+            for lang in project.get('scc_language_summary', []) or []:
+                # Use Code lines as a better proxy for real code volume
+                original_name = lang.get('Name')
+                code_lines = int(lang.get('Code', 0) or 0)
+                # Apply language filter and canonicalization from config
+                if original_name and self.config.is_language_reportable(original_name):
+                    name = self.config.canonical_language(original_name) or original_name
+                    scc_lang_totals[name] = scc_lang_totals.get(name, 0) + code_lines
+
+        if scc_lang_totals:
+            # Apply min-lines threshold from config
+            filtered_totals = {k: v for k, v in scc_lang_totals.items() if v >= self.config.min_language_lines}
+            totals_to_use = filtered_totals or scc_lang_totals  # fallback if everything filtered out
+            # Sort and group tail for readability in a pie
+            sorted_items = sorted(totals_to_use.items(), key=lambda x: x[1], reverse=True)
+            top_n = 12
+            top_items = sorted_items[:top_n]
+            other_total = sum(v for _, v in sorted_items[top_n:])
+            names = [k for k, _ in top_items]
+            values = [int(v) for _, v in top_items]
+            if other_total > 0:
+                names.append('Other')
+                values.append(int(other_total))
+
+            fig_lang = go.Figure(data=[go.Pie(
+                labels=names,
+                values=values,
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Code lines: %{value:,}<extra></extra>'
+            )])
+            # Remove plot title for a cleaner card layout
+            fig_lang.update_layout(title=None)
+            charts['language_distribution'] = fig_lang.to_html(include_plotlyjs=False, div_id="lang-chart")
+        elif summary['languages']:
+            # Fallback: primary languages distribution
             fig_lang = px.pie(
                 values=list(summary['languages'].values()),
                 names=list(summary['languages'].keys()),
-                title="Primary Languages Distribution"
+                title=None
             )
+            fig_lang.update_layout(title=None)
             charts['language_distribution'] = fig_lang.to_html(include_plotlyjs=False, div_id="lang-chart")
         
         # Dependency license distribution bar chart (executive summary)
@@ -423,39 +490,64 @@ class ReportGenerator:
             
             # Create DataFrame explicitly to avoid encoding issues
             import pandas as pd
+            # Render as a pie chart for easier at-a-glance reading
             exec_df = pd.DataFrame({
                 'license': exec_chart_names,
                 'count': exec_chart_values
             })
-            
-            # Use graph_objects for vertical bar chart - more natural layout than horizontal
-            fig_dep_licenses = go.Figure(data=[go.Bar(
-                x=exec_chart_names,
-                y=exec_chart_values,
-                hovertemplate='<b>%{x}</b><br>Dependencies: %{y}<extra></extra>',
-                marker_color='#3B82F6'
+            fig_dep_licenses = go.Figure(data=[go.Pie(
+                labels=exec_chart_names,
+                values=exec_chart_values,
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Dependencies: %{value}<br>Percentage: %{percent}<extra></extra>'
             )])
-            fig_dep_licenses.update_layout(
-                title_text="Dependency License Distribution",
-                xaxis_title="License Type",
-                yaxis_title="Number of Dependencies",
-                height=400,
-                xaxis={'tickangle': 45}  # Angle the license names for better readability
-            )
+            # Remove title to avoid duplication with surrounding header
+            fig_dep_licenses.update_layout(title=None)
             charts['dependency_license_distribution'] = fig_dep_licenses.to_html(include_plotlyjs=False, div_id="dep-license-chart")
         
-        # Security overview chart
-        vuln_projects = sum(1 for p in processed_data['projects'].values() 
-                           if p.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0)
-        safe_projects = summary['successful_analyses'] - vuln_projects
-        
-        fig_security = go.Figure(data=[
-            go.Bar(x=['Projects with Vulnerabilities', 'Secure Projects'], 
-                   y=[vuln_projects, safe_projects],
-                   marker_color=['red', 'green'])
-        ])
-        fig_security.update_layout(title="Security Overview")
-        charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
+        # Portfolio value chart (COCOMO estimated cost by project)
+        value_labels: List[str] = []
+        value_values: List[float] = []
+        for project in processed_data['projects'].values():
+            cost = float(project.get('scc_estimated_cost', 0.0) or 0.0)
+            if cost > 0 and project.get('success'):
+                value_labels.append(project.get('name', 'Unknown'))
+                value_values.append(cost)
+
+        if value_values:
+            # Limit number of slices for readability; group the rest under "Other"
+            items = list(zip(value_labels, value_values))
+            items.sort(key=lambda x: x[1], reverse=True)
+            top_n = 12
+            top_items = items[:top_n]
+            other_total = sum(v for _, v in items[top_n:])
+            labels_plot = [lbl for lbl, _ in top_items]
+            values_plot = [val for _, val in top_items]
+            if other_total > 0:
+                labels_plot.append('Other')
+                values_plot.append(other_total)
+
+            fig_value = go.Figure(data=[go.Pie(
+                labels=labels_plot,
+                values=values_plot,
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Estimated Value: $%{value:,.0f}<extra></extra>'
+            )])
+            # Remove title for a cleaner card header + plot combo
+            fig_value.update_layout(title=None)
+            charts['portfolio_value'] = fig_value.to_html(include_plotlyjs=False, div_id="portfolio-value-chart")
+        else:
+            # Fallback: retain the simple security overview
+            vuln_projects = sum(1 for p in processed_data['projects'].values() 
+                               if p.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0)
+            safe_projects = summary['successful_analyses'] - vuln_projects
+            fig_security = go.Figure(data=[
+                go.Bar(x=['Projects with Vulnerabilities', 'Secure Projects'], 
+                       y=[vuln_projects, safe_projects],
+                       marker_color=['red', 'green'])
+            ])
+            fig_security.update_layout(title="Security Overview")
+            charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
         
         # Development Activity Dashboard
         projects = list(processed_data['projects'].values())
@@ -466,89 +558,59 @@ class ReportGenerator:
                 activity_score, breakdown = self._calculate_activity_score(project)
                 activity_data.append({
                     'name': project['name'],
-                    'score': activity_score,
+                    'score': max(activity_score, 0),
                     'breakdown': breakdown
                 })
-            
-            # Sort by activity score (highest first)
+
+            # Sort and group tail for readability in a pie
             activity_data.sort(key=lambda x: x['score'], reverse=True)
-            
-            project_names = [item['name'] for item in activity_data]
-            activity_scores = [item['score'] for item in activity_data]
-            
-            # Create color mapping based on activity level
-            colors = []
-            for score in activity_scores:
-                if score >= 70:
-                    colors.append('#10B981')  # High activity - green
-                elif score >= 40:
-                    colors.append('#3B82F6')  # Moderate activity - blue  
-                elif score >= 15:
-                    colors.append('#F59E0B')  # Low activity - amber
-                else:
-                    colors.append('#6B7280')  # Dormant - gray
-            
-            # Create hover text with breakdown details
-            hover_texts = []
-            for item in activity_data:
-                breakdown = item['breakdown']
-                hover_text = (
-                    f"<b>{item['name']}</b><br>"
-                    f"Activity Score: {item['score']}/100<br><br>"
-                    f"<b>Development:</b><br>"
-                    f"• Commits: {breakdown['commits']}<br>"
-                    f"• Contributors: {breakdown['contributors']}<br><br>"
-                    f"<b>Production:</b><br>"
-                    f"• Sentry Events: {breakdown['sentry_events']}<br>"
-                    f"• Active Issues: {breakdown['sentry_issues']}<br><br>"
-                    f"<b>Engagement:</b><br>"
-                    f"• GitHub Stars: {breakdown['stars']}"
-                    f"<extra></extra>"
+            top_n = 12
+            top_items = activity_data[:top_n]
+            other_items = activity_data[top_n:]
+
+            labels = [item['name'] for item in top_items]
+            values = [item['score'] for item in top_items]
+            if other_items:
+                labels.append('Other')
+                values.append(sum(i['score'] for i in other_items))
+
+            # Prepare customdata for detailed hover for top items
+            customdata = []
+            for item in top_items:
+                b = item['breakdown']
+                customdata.append([b['commits'], b['contributors'], b['sentry_events'], b['sentry_issues'], b['stars'], item['score']])
+            if other_items:
+                # Aggregate minimal info for Other
+                commits = sum(i['breakdown']['commits'] for i in other_items)
+                contributors = sum(i['breakdown']['contributors'] for i in other_items)
+                sentry_events = sum(i['breakdown']['sentry_events'] for i in other_items)
+                sentry_issues = sum(i['breakdown']['sentry_issues'] for i in other_items)
+                stars = sum(i['breakdown']['stars'] for i in other_items)
+                score_sum = sum(i['score'] for i in other_items)
+                customdata.append([commits, contributors, sentry_events, sentry_issues, stars, score_sum])
+
+            fig_activity = go.Figure(data=[go.Pie(
+                labels=labels,
+                values=values,
+                textinfo='label+percent',
+                customdata=customdata,
+                hovertemplate=(
+                    '<b>%{label}</b><br>'
+                    'Activity Score Share: %{percent}<br>'
+                    '<br><b>Details (aggregated)</b><br>'
+                    '• Commits: %{customdata[0]}<br>'
+                    '• Contributors: %{customdata[1]}<br>'
+                    '• Sentry Events: %{customdata[2]}<br>'
+                    '• Sentry Issues: %{customdata[3]}<br>'
+                    '• Stars: %{customdata[4]}<br>'
+                    '• Score: %{customdata[5]}'
+                    '<extra></extra>'
                 )
-                hover_texts.append(hover_text)
-            
-            # Create horizontal bar chart
-            fig_activity = go.Figure(data=[
-                go.Bar(
-                    y=project_names,
-                    x=activity_scores,
-                    orientation='h',
-                    marker_color=colors,
-                    hovertemplate=hover_texts,
-                    text=[f"{score}" for score in activity_scores],
-                    textposition='inside',
-                    textfont=dict(color='white', size=12)
-                )
-            ])
-            
-            fig_activity.update_layout(
-                title={
-                    'text': "Development Activity Dashboard<br><sub>Which repositories are actively developed and used (Past 30 Days)</sub>",
-                    'x': 0.5,
-                    'xanchor': 'center',
-                    'font': {'size': 20}
-                },
-                height=max(600, len(projects) * 35 + 150),  # Dynamic height based on number of repos
-                xaxis_title="Activity Score (0-100)",
-                yaxis_title="",
-                showlegend=False,
-                margin=dict(l=150, r=50, t=100, b=50),  # More left margin for repo names
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-            )
-            
-            # Update axes
-            fig_activity.update_xaxes(
-                range=[0, 100],
-                showgrid=True,
-                gridcolor='rgba(0,0,0,0.1)',
-                gridwidth=1
-            )
-            fig_activity.update_yaxes(
-                showgrid=False,
-                tickmode='linear'
-            )
-            
+            )])
+
+            # Remove plot title to avoid overlap with card header
+            fig_activity.update_layout(title=None)
+
             charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs=False, div_id="activity-chart")
         
         return charts
@@ -642,8 +704,8 @@ class ReportGenerator:
         template_data = {
             'project': project_data,
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'has_vulnerabilities': len(project_data.get('vulnerabilities', [])) > 0,
-            'vulnerability_count': len(project_data.get('vulnerabilities', [])),
+            'has_vulnerabilities': len(project_data.get('vulnerabilities_prod', [])) > 0,
+            'vulnerability_count': len(project_data.get('vulnerabilities_prod', [])),
             'dependency_count': project_data.get('vulnerability_summary', {}).get('total_dependencies', 0),
             'dependency_license_chart': project_dep_license_chart
         }
@@ -727,8 +789,8 @@ class ReportGenerator:
                 enhanced_project = dict(project_data)
                 enhanced_project.update({
                     'dependency_license_chart': project_dep_license_chart,
-                    'has_vulnerabilities': len(project_data.get('vulnerabilities', [])) > 0,
-                    'vulnerability_count': len(project_data.get('vulnerabilities', [])),
+                    'has_vulnerabilities': len(project_data.get('vulnerabilities_prod', [])) > 0,
+                    'vulnerability_count': len(project_data.get('vulnerabilities_prod', [])),
                     'dependency_count': project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)
                 })
                 enhanced_projects[repo_url] = enhanced_project
@@ -1030,7 +1092,11 @@ class ReportGenerator:
             </div>
             {% endif %}
             
-            {% if charts.security_overview %}
+            {% if charts.portfolio_value %}
+            <div class="chart-container">
+                {{ charts.portfolio_value | safe }}
+            </div>
+            {% elif charts.security_overview %}
             <div class="chart-container">
                 {{ charts.security_overview | safe }}
             </div>

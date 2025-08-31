@@ -109,7 +109,7 @@
 <!-- Technology Stack -->
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-accent-600 to-accent-700 p-8 text-white">
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -190,11 +190,21 @@
 <!-- Security Assessment -->
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-{% if project.vulnerabilities %}danger{% else %}success{% endif %}-600 to-{% if project.vulnerabilities %}danger{% else %}success{% endif %}-700 p-8 text-white">
+        {# Determine if security risk is "high" (any high/critical severity or >=3 prod vulns) #}
+        {% set ns = namespace(high=false) %}
+        {% for v in project.vulnerabilities_prod or [] %}
+            {% if v.vulnerability and v.vulnerability.severity %}
+                {% if 'high' in v.vulnerability.severity|lower or 'critical' in v.vulnerability.severity|lower %}
+                    {% set ns.high = true %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% set is_high_risk = ns.high or (project.vulnerabilities_prod|length > 2) %}
+        <div class="bg-gradient-to-r from-{% if is_high_risk %}warning{% else %}primary{% endif %}-600 to-{% if is_high_risk %}warning{% else %}primary{% endif %}-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        {% if project.vulnerabilities %}
+                        {% if project.vulnerabilities_prod %}
                         <path d="M12 9v2m0 4h.01M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                         {% else %}
                         <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -203,14 +213,18 @@
                 </div>
                 <div>
                     <h3 class="text-3xl font-bold">Security Assessment</h3>
-                    <p class="text-{% if project.vulnerabilities %}danger{% else %}success{% endif %}-200">
-                        {% if project.vulnerabilities %}{{ project.vulnerabilities|length }} vulnerabilities detected{% else %}No security issues found{% endif %}
+                    <p class="text-{% if is_high_risk %}warning{% else %}primary{% endif %}-200">
+                        {% if project.vulnerabilities_prod %}
+                            {{ project.vulnerabilities_prod|length }} production vulnerabilities detected
+                        {% else %}
+                            No production vulnerabilities found
+                        {% endif %}
                     </p>
                 </div>
             </div>
         </div>
         <div class="p-8">
-            {% if project.vulnerabilities %}
+            {% if project.vulnerabilities_prod %}
                 <div class="mb-6">
                     <div class="bg-danger-50 border border-danger-200 rounded-xl p-6">
                         <div class="flex items-center mb-4">
@@ -221,17 +235,16 @@
                             </div>
                             <h4 class="text-xl font-semibold text-danger-800">Security Vulnerabilities Detected</h4>
                         </div>
-                        <p class="text-danger-700">{{ project.vulnerabilities|length }} security vulnerabilities found in project dependencies. Immediate attention recommended.</p>
+                        <p class="text-danger-700">{{ project.vulnerabilities_prod|length }} production vulnerabilities found in project dependencies. Immediate attention recommended.</p>
                     </div>
                 </div>
                 
                 <div class="space-y-4">
-                    {% for vuln in project.vulnerabilities[:10] %}
+                    {% for vuln in project.vulnerabilities_prod[:10] %}
                         <div class="bg-gradient-to-r from-white to-slate-50 border-l-4 {% if 'high' in vuln.vulnerability.severity.lower() %}border-danger-500{% elif 'medium' in vuln.vulnerability.severity.lower() %}border-warning-500{% else %}border-yellow-400{% endif %} p-6 rounded-r-xl shadow-sm">
                             <div class="flex justify-between items-start mb-3">
                                 <div>
                                     <h5 class="text-lg font-semibold text-slate-800">{{ vuln.package }}</h5>
-                                    <p class="text-sm text-slate-600">Version {{ vuln.version }}</p>
                                 </div>
                                 <span class="px-3 py-1 rounded-full text-xs font-bold uppercase
                                     {% if 'high' in vuln.vulnerability.severity.lower() %}bg-danger-100 text-danger-700
@@ -240,11 +253,21 @@
                                     {{ vuln.vulnerability.severity }}
                                 </span>
                             </div>
-                            <p class="text-slate-700 mb-3">{{ vuln.vulnerability.summary }}</p>
                             {% if vuln.vulnerability.id %}
+                                {% set vid = vuln.vulnerability.id %}
+                                {% set link = None %}
+                                {% if vid[:5] == 'GHSA-' %}
+                                    {% set link = 'https://github.com/advisories/' + vid %}
+                                {% elif vid[:4] == 'CVE-' %}
+                                    {% set link = 'https://nvd.nist.gov/vuln/detail/' + vid %}
+                                {% endif %}
                                 <div class="bg-slate-100 p-3 rounded-lg">
                                     <span class="text-xs font-medium text-slate-600">Vulnerability ID:</span>
-                                    <code class="ml-2 bg-slate-200 px-2 py-1 rounded text-xs font-mono">{{ vuln.vulnerability.id }}</code>
+                                    {% if link %}
+                                        <a href="{{ link }}" target="_blank" class="ml-2 underline text-primary-700 text-xs font-mono">{{ vid }}</a>
+                                    {% else %}
+                                        <code class="ml-2 bg-slate-200 px-2 py-1 rounded text-xs font-mono">{{ vid }}</code>
+                                    {% endif %}
                                 </div>
                             {% endif %}
                         </div>
@@ -257,8 +280,41 @@
                             <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
-                    <h4 class="text-2xl font-bold text-success-600 mb-2">No Security Vulnerabilities</h4>
-                    <p class="text-slate-600 max-w-md mx-auto">All dependencies have been scanned and no known vulnerabilities were detected. Your project follows security best practices.</p>
+                    <h4 class="text-2xl font-bold text-success-600 mb-2">No Production Vulnerabilities</h4>
+                    <p class="text-slate-600 max-w-md mx-auto">All production dependencies have been scanned and no known vulnerabilities were detected.</p>
+                </div>
+            {% endif %}
+
+            {% if project.vulnerabilities_dev %}
+                <div class="mt-8">
+                    <details class="bg-slate-50 border border-slate-200 rounded-xl">
+                        <summary class="cursor-pointer select-none p-4 text-slate-700 font-medium flex items-center justify-between">
+                            <span>Developer Dependencies: {{ project.vulnerabilities_dev|length }} vulnerabilities (dev-only)</span>
+                            <span class="text-xs text-slate-500">Click to expand</span>
+                        </summary>
+                        <div class="p-6 space-y-4">
+                            {% for vuln in project.vulnerabilities_dev[:20] %}
+                                <div class="bg-white border-l-4 {% if 'high' in vuln.vulnerability.severity.lower() %}border-warning-500{% elif 'medium' in vuln.vulnerability.severity.lower() %}border-yellow-400{% else %}border-slate-300{% endif %} p-6 rounded-r-xl shadow-sm">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h5 class="text-lg font-semibold text-slate-800">{{ vuln.package }} <span class="text-xs text-slate-500">(dev)</span></h5>
+                                            <p class="text-sm text-slate-600">Version {{ vuln.version }}</p>
+                                        </div>
+                                        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase bg-slate-100 text-slate-700">
+                                            {{ vuln.vulnerability.severity }}
+                                        </span>
+                                    </div>
+                                    <p class="text-slate-700 mb-3">{{ vuln.vulnerability.summary }}</p>
+                                    {% if vuln.vulnerability.id %}
+                                        <div class="bg-slate-100 p-3 rounded-lg">
+                                            <span class="text-xs font-medium text-slate-600">Vulnerability ID:</span>
+                                            <code class="ml-2 bg-slate-200 px-2 py-1 rounded text-xs font-mono">{{ vuln.vulnerability.id }}</code>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </details>
                 </div>
             {% endif %}
         </div>
@@ -268,7 +324,7 @@
 <!-- Development Analytics -->
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-accent-600 to-accent-700 p-8 text-white">
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -277,7 +333,7 @@
                 </div>
                 <div>
                     <h3 class="text-3xl font-bold">Development Analytics</h3>
-                    <p class="text-accent-200">Past 30 days activity metrics</p>
+                    <p class="text-primary-200">Past 30 days activity metrics</p>
                 </div>
             </div>
         </div>
@@ -361,7 +417,7 @@
 {% if project.scc_enabled %}
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-purple-600 to-purple-700 p-8 text-white">
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -508,7 +564,7 @@
 {% else %}
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-slate-600 to-slate-700 p-8 text-white">
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -543,7 +599,10 @@
 {% if project.sentry_enabled %}
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-warning-600 to-warning-700 p-8 text-white">
+        {% set issues_total = project.sentry_issues.past_month.total | default(0) %}
+        {% set events_total = project.sentry_issues.events_count | default(0) %}
+        {% set is_error_high = issues_total > 10 or events_total > 100 %}
+        <div class="bg-gradient-to-r from-{% if is_error_high %}warning{% else %}primary{% endif %}-600 to-{% if is_error_high %}warning{% else %}primary{% endif %}-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -552,7 +611,7 @@
                 </div>
                 <div>
                     <h3 class="text-3xl font-bold">Error Monitoring</h3>
-                    <p class="text-warning-200">Sentry integration analytics</p>
+                    <p class="text-{% if is_error_high %}warning{% else %}primary{% endif %}-200">Sentry integration analytics</p>
                 </div>
             </div>
         </div>
@@ -623,7 +682,7 @@
 {% else %}
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-slate-600 to-slate-700 p-8 text-white">
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -658,7 +717,7 @@
 {% if project.dependency_license_chart or dependency_license_chart %}
 <div class="mb-12">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="bg-gradient-to-r from-success-600 to-success-700 p-8 text-white">
+        <div class="bg-gradient-to-r from-primary-600 to-primary-700 p-8 text-white">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">

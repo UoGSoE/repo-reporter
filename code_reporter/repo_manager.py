@@ -28,7 +28,8 @@ class RepositoryManager:
                 ['gh', '--version'],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=30
             )
         except FileNotFoundError:
             raise RuntimeError("gh CLI not found. Please install GitHub CLI.")
@@ -78,12 +79,32 @@ class RepositoryManager:
         self.temp_dirs.append(temp_dir)
         
         try:
+            # Normalize to OWNER/REPO for gh CLI when possible
+            gh_target = repo_url
+            try:
+                parsed = repo_url
+                if repo_url.startswith('https://github.com/'):
+                    parts = repo_url.replace('https://github.com/', '').split('/')
+                elif repo_url.startswith('git@github.com:'):
+                    parts = repo_url.replace('git@github.com:', '').replace('.git', '').split('/')
+                else:
+                    parts = []
+                if len(parts) >= 2:
+                    owner = parts[0]
+                    name = parts[1].replace('.git', '')
+                    if owner and name:
+                        gh_target = f"{owner}/{name}"
+            except Exception:
+                # Fall back to original URL if parsing fails
+                gh_target = repo_url
+
             # Use gh CLI to clone repository (handles both public and private repos)
             result = subprocess.run(
-                ['gh', 'repo', 'clone', repo_url, str(temp_dir)],
+                ['gh', 'repo', 'clone', gh_target, str(temp_dir)],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=30
             )
             
             return RepoInfo(

@@ -4,7 +4,7 @@ import json
 import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import click
+from .logger import get_logger
 
 
 class GitHubAnalyzer:
@@ -21,10 +21,12 @@ class GitHubAnalyzer:
                 ['gh', 'auth', 'status'],
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
+                timeout=30
             )
             if result.returncode != 0:
-                click.echo("⚠️ Warning: gh CLI not authenticated. Some features may not work.")
+                logger = get_logger()
+                logger.warning("gh CLI not authenticated. Some features may not work.")
         except FileNotFoundError:
             raise RuntimeError("gh CLI not found. Please install GitHub CLI.")
     
@@ -68,7 +70,8 @@ class GitHubAnalyzer:
             
         except Exception as e:
             result['error'] = str(e)
-            click.echo(f"  ⚠️ GitHub API error for {repo_full_name}: {str(e)}")
+            logger = get_logger()
+            logger.warning(f"GitHub CLI/API error for {repo_full_name}: {str(e)}")
         
         return result
     
@@ -79,7 +82,7 @@ class GitHubAnalyzer:
             '--json', 'name,description,stargazerCount,forkCount,primaryLanguage,createdAt,pushedAt,isPrivate,licenseInfo'
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
         data = json.loads(result.stdout)
         
         return {
@@ -109,7 +112,7 @@ class GitHubAnalyzer:
         ]
         
         try:
-            result = subprocess.run(cmd_created, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd_created, capture_output=True, text=True, check=True, timeout=30)
             issues_data = json.loads(result.stdout)
             
             # Categorize issues
@@ -127,7 +130,7 @@ class GitHubAnalyzer:
                 '--limit', '1000'
             ]
             
-            result_closed = subprocess.run(cmd_closed, capture_output=True, text=True, check=True)
+            result_closed = subprocess.run(cmd_closed, capture_output=True, text=True, check=True, timeout=30)
             closed_data = json.loads(result_closed.stdout)
             resolved_count = len(closed_data)
             
@@ -179,7 +182,7 @@ class GitHubAnalyzer:
         ]
         
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
             
             if not result.stdout.strip():
                 return {
@@ -234,7 +237,7 @@ class GitHubAnalyzer:
         ]
         
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
             
             if not result.stdout.strip():
                 return {'total': 0, 'top_contributors': []}

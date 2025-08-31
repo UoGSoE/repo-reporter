@@ -258,8 +258,8 @@ class LanguageDetector:
         
         # Check requirements files for framework dependencies
         framework_patterns = {
-            'django': [r'[Dd]jango==?', r'^django$', r'django>'],
-            'flask': [r'[Ff]flask==?', r'^flask$', r'flask>'],
+            'django': [r'[Dd]jango==?', r'^django$', r'[Dd]jango>'],
+            'flask': [r'[Ff]lask==?', r'^flask$', r'[Ff]lask>'],
             'fastapi': [r'[Ff]ast[Aa][Pp][Ii]==?', r'^fastapi$'],
             'tornado': [r'[Tt]ornado==?', r'^tornado$']
         }

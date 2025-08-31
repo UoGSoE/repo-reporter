@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 import requests
+import time
 import tomli
 import yaml
 
@@ -64,13 +65,21 @@ class DependencyAnalyzer:
         # Check for vulnerabilities
         all_packages = self._flatten_dependencies(result['dependencies'])
         result['vulnerabilities'] = self._check_vulnerabilities(all_packages)
-        
+
+        # Compute unique non-dev vulnerable packages for clearer managerial reporting
+        unique_non_dev_packages = set()
+        for finding in result['vulnerabilities']:
+            if not finding.get('dev_dependency'):
+                unique_non_dev_packages.add((finding.get('language'), finding.get('package')))
+
+        # Update headline summary to exclude dev deps and use unique package count
+        result['summary']['vulnerable_packages'] = len(unique_non_dev_packages)
+
         # Collect license information for dependencies
         result['licenses'] = self._collect_dependency_licenses(all_packages, repo_path, language_info)
         
         # Update summary
         result['summary']['total_dependencies'] = len(all_packages)
-        result['summary']['vulnerable_packages'] = len(result['vulnerabilities'])
         
         return result
     
@@ -397,34 +406,105 @@ class DependencyAnalyzer:
         return packages
     
     def _check_vulnerabilities(self, packages: List[Dict]) -> List[Dict]:
-        """Check packages for known vulnerabilities using OSV API."""
-        vulnerabilities = []
-        
-        for package in packages:
-            if package['version'] == 'unknown':
+        """Check packages for known vulnerabilities using OSV batch API with fallback."""
+        logger = get_logger()
+        ecosystem_map = {
+            'python': 'PyPI',
+            'php': 'Packagist',
+            'golang': 'Go'
+        }
+
+        # Build unique queries and index map
+        queries = []
+        index_to_pkg = []
+        seen = set()
+        for pkg in packages:
+            if pkg['version'] == 'unknown':
                 continue
-            
-            # Create cache key
-            cache_key = f"{package['language']}:{package['name']}:{package['version']}"
-            
+            eco = ecosystem_map.get(pkg['language'])
+            if not eco:
+                continue
+            key = (pkg['language'], pkg['name'], pkg['version'])
+            if key in seen:
+                continue
+            seen.add(key)
+            # Cache hit shortcut
+            cache_key = f"{key[0]}:{key[1]}:{key[2]}"
             if cache_key in self._cve_cache:
-                vulns = self._cve_cache[cache_key]
-            else:
-                vulns = self._query_osv_api(package)
+                continue  # will be added from cache later
+            queries.append({
+                "package": {"name": pkg['name'], "ecosystem": eco},
+                "version": pkg['version']
+            })
+            index_to_pkg.append(key)
+
+        # Call batch endpoint in chunks
+        batch_vulns_map = {}
+        url = f"{self.osv_api_base}/querybatch"
+        chunk_size = 100
+        for i in range(0, len(queries), chunk_size):
+            chunk = queries[i:i+chunk_size]
+            attempt = 0
+            while attempt < 3:
+                try:
+                    resp = self.session.post(url, json={"queries": chunk}, timeout=20)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        results = data.get('results', [])
+                        for j, res in enumerate(results):
+                            idx = i + j
+                            if idx >= len(index_to_pkg):
+                                continue
+                            key = index_to_pkg[idx]
+                            vulns = res.get('vulns', []) or []
+                            # Normalize vuln records similar to single query
+                            norm = [
+                                {
+                                    'id': v.get('id'),
+                                    'summary': v.get('summary', 'No summary available'),
+                                    'severity': self._extract_severity(v),
+                                    'published': v.get('published'),
+                                    'modified': v.get('modified')
+                                }
+                                for v in vulns
+                            ]
+                            self._cve_cache[f"{key[0]}:{key[1]}:{key[2]}"] = norm
+                            batch_vulns_map[key] = norm
+                        break
+                    else:
+                        attempt += 1
+                        time.sleep(0.5 * (attempt))
+                except Exception as e:
+                    attempt += 1
+                    if attempt >= 3:
+                        logger.warning(f"OSV batch query failed after retries: {e}")
+                    else:
+                        time.sleep(0.5 * (attempt))
+
+        # Aggregate all vulnerabilities from cache/batch per input package (preserve dev flag)
+        vulnerabilities: List[Dict] = []
+        for pkg in packages:
+            if pkg['version'] == 'unknown':
+                continue
+            eco = ecosystem_map.get(pkg['language'])
+            if not eco:
+                continue
+            cache_key = f"{pkg['language']}:{pkg['name']}:{pkg['version']}"
+            vulns = self._cve_cache.get(cache_key)
+            if vulns is None:
+                # Fallback to single query if not cached from batch
+                vulns = self._query_osv_api(pkg)
                 self._cve_cache[cache_key] = vulns
-            
             if vulns:
-                vulnerabilities.extend([
-                    {
-                        'package': package['name'],
-                        'version': package['version'],
-                        'language': package['language'],
-                        'vulnerability': vuln,
-                        'dev_dependency': package['dev']
-                    }
-                    for vuln in vulns
-                ])
-        
+                for v in vulns:
+                    vulnerabilities.append({
+                        'package': pkg['name'],
+                        'version': pkg['version'],
+                        'language': pkg['language'],
+                        'vulnerability': v,
+                        'dev_dependency': pkg['dev']
+                    })
+
         return vulnerabilities
     
     def _query_osv_api(self, package: Dict) -> List[Dict]:
@@ -607,7 +687,7 @@ class DependencyAnalyzer:
             if not vendor_path.exists():
                 logger.debug("Installing composer dependencies")
                 install_result = subprocess.run(
-                    ['composer', 'install', '--no-dev', '--quiet'],
+                    ['composer', 'install', '--no-dev', '--no-scripts', '--quiet'],
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
@@ -662,7 +742,7 @@ class DependencyAnalyzer:
                                 'raw_license': 'No license in composer output',
                                 'source': 'composer_no_license'
                             }
-                            print(f"      ❓ {name}: No license info")
+                            logger.debug(f"No license info for {name}")
                     
                     logger.debug(f"Composer licenses parsed: {len(licenses)} packages")
                     
@@ -671,16 +751,16 @@ class DependencyAnalyzer:
                     logger.debug(f"Raw output: {result.stdout[:200]}...")
                     
             else:
-                print(f"   ❌ Composer licenses command failed (exit code {result.returncode})")
+                logger.warning(f"Composer licenses command failed (exit code {result.returncode})")
                 if result.stderr:
                     logger.debug(f"Error: {result.stderr[:200]}...")
                     
         except subprocess.TimeoutExpired:
-            print(f"   ⏰ Composer licenses command timed out")
+            logger.warning("Composer licenses command timed out")
         except FileNotFoundError:
-            print(f"   ❌ Composer command not found - falling back to API")
+            logger.warning("Composer command not found - falling back to API")
         except Exception as e:
-            print(f"   ❌ Composer licenses error: {e}")
+            logger.warning(f"Composer licenses error: {e}")
         
         return licenses
     
@@ -730,8 +810,9 @@ class DependencyAnalyzer:
                 license_from_api = info.get('license')
                 classifiers = info.get('classifiers', [])
                 license_classifiers = [c for c in classifiers if c.startswith('License ::')]
-                print(f"      🔎 PyPI response - license field: {repr(license_from_api)}")
-                print(f"      🔎 PyPI response - license classifiers: {license_classifiers}")
+                logger = get_logger()
+                logger.debug(f"PyPI response - license field: {repr(license_from_api)}")
+                logger.debug(f"PyPI response - license classifiers: {license_classifiers}")
                 
                 # Try license field first
                 license_text = info.get('license') or ''
@@ -780,12 +861,13 @@ class DependencyAnalyzer:
                     }
                 
                 # Debug: Show full info for packages with no license
-                print(f"      🔎 No license found for {package_name}. Available info keys: {list(info.keys())}")
+                logger = get_logger()
+                logger.debug(f"No license found for {package_name}. Available info keys: {list(info.keys())}")
                 license_related_fields = {k: v for k, v in info.items() if 'license' in k.lower()}
-                print(f"      🔎 License-related fields: {license_related_fields}")
+                logger.debug(f"License-related fields: {license_related_fields}")
                 if 'classifiers' in info:
                     all_classifiers = info.get('classifiers', [])
-                    print(f"      🔎 All classifiers: {[c for c in all_classifiers if 'license' in c.lower() or 'License' in c]}")
+                    logger.debug(f"All classifiers: {[c for c in all_classifiers if 'license' in c.lower() or 'License' in c]}")
                 
                 return {
                     'license': 'Unknown',
@@ -794,7 +876,8 @@ class DependencyAnalyzer:
                 }
         
         except Exception as e:
-            print(f"      ⚠️ PyPI API error for {package_name}: {str(e)}")
+            logger = get_logger()
+            logger.warning(f"PyPI API error for {package_name}: {str(e)}")
             return {
                 'license': 'Unknown',
                 'raw_license': f'API Error: {str(e)}',
@@ -834,7 +917,8 @@ class DependencyAnalyzer:
                 }
         
         except Exception as e:
-            print(f"      ⚠️ Packagist API error for {package_name}: {str(e)}")
+            logger = get_logger()
+            logger.warning(f"Packagist API error for {package_name}: {str(e)}")
             return {
                 'license': 'Unknown',
                 'raw_license': f'API Error: {str(e)}',
@@ -868,7 +952,8 @@ class DependencyAnalyzer:
             }
         
         except Exception as e:
-            print(f"      ⚠️ Go package API error for {package_name}: {str(e)}")
+            logger = get_logger()
+            logger.warning(f"Go package API error for {package_name}: {str(e)}")
             return {
                 'license': 'Unknown',
                 'raw_license': f'API Error: {str(e)}',
