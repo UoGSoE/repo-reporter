@@ -30,3 +30,8 @@ Formatting requirements (important):
   - **Status:** one short sentence on activity/engagement
   - **Risks/Actions:** one short sentence with key risk or next step
 - Avoid tables; keep to 40–100 words total.
+
+Constraints and phrasing (important):
+- Prefer small, concrete, low-effort actions over process or staffing recommendations.
+- If this project uses PHP/Composer (infer from `project_json` languages/dependencies), phrase dependency remediation as a quick step, e.g., “Run composer update; re-run tests; merge”.
+- Avoid suggesting pair-programming, onboarding, or consolidation unless clearly missing per `project_json`.

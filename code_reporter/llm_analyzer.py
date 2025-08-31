@@ -203,6 +203,10 @@ Focus on business value, current status, and any concerns for management attenti
         vulnerable_projects_count = 0
         high_activity_count = 0
         
+        # Track dependency usage across projects (for shared deps and vuln roll-ups)
+        dep_usage: Dict[tuple, Dict[str, Any]] = {}
+        php_composer_present = False
+        
         for project in projects.values():
             if not project.get('success'):
                 continue
@@ -223,6 +227,65 @@ Focus on business value, current status, and any concerns for management attenti
             commits = project.get('github_commits', {}).get('past_month', {}).get('total', 0)
             if commits >= 10:
                 high_activity_count += 1
+            
+            # Aggregate dependency usage
+            deps = project.get('dependencies', {}) or {}
+            if 'php' in deps:
+                php_composer_present = True
+            project_id = project.get('full_name') or project.get('name')
+            if isinstance(deps, dict):
+                for lang, dep_categories in deps.items():
+                    if not isinstance(dep_categories, dict):
+                        continue
+                    for category, packages in dep_categories.items():
+                        if not isinstance(packages, dict):
+                            continue
+                        is_dev = (category == 'dev_packages')
+                        for pkg_name in packages.keys():
+                            key = (lang, pkg_name)
+                            entry = dep_usage.setdefault(key, {
+                                'language': lang,
+                                'name': pkg_name,
+                                'projects': set(),
+                                'prod_projects': set(),
+                                'dev_projects': set(),
+                                'vulns_total': 0,
+                                'vulns_prod': 0,
+                                'severity_max': None,
+                            })
+                            entry['projects'].add(project_id)
+                            if is_dev:
+                                entry['dev_projects'].add(project_id)
+                            else:
+                                entry['prod_projects'].add(project_id)
+            
+            # Aggregate vulnerabilities per dependency
+            for v in project.get('vulnerabilities', []) or []:
+                lang = v.get('language')
+                pkg = v.get('package')
+                if not lang or not pkg:
+                    continue
+                key = (lang, pkg)
+                entry = dep_usage.setdefault(key, {
+                    'language': lang,
+                    'name': pkg,
+                    'projects': set(),
+                    'prod_projects': set(),
+                    'dev_projects': set(),
+                    'vulns_total': 0,
+                    'vulns_prod': 0,
+                    'severity_max': None,
+                })
+                entry['vulns_total'] += 1
+                if not v.get('dev_dependency'):
+                    entry['vulns_prod'] += 1
+                sev = (v.get('vulnerability') or {}).get('severity')
+                # Compute severity max
+                rank_map = {'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1}
+                new_rank = rank_map.get(str(sev).upper(), 0)
+                cur_rank = rank_map.get(str(entry['severity_max']).upper(), 0) if entry['severity_max'] else 0
+                if new_rank > cur_rank:
+                    entry['severity_max'] = str(sev) if sev else entry['severity_max']
         
         # Calculate portfolio-level insights
         total_projects = summary['successful_analyses']
@@ -280,6 +343,48 @@ Focus on business value, current status, and any concerns for management attenti
             context['business_metrics']['estimated_value'] = summary['scc_metrics']['total_estimated_cost']
             context['business_metrics']['code_volume'] = summary['scc_metrics']['total_lines']
         
+        # Dependency aggregates and profile
+        total_unique = context['business_metrics']['unique_dependency_count']
+        shared_deps = []
+        vulnerable_agg = []
+        shared_unique_count = 0
+        for entry in dep_usage.values():
+            projects_affected = len(entry['projects'])
+            if projects_affected >= 2:
+                shared_unique_count += 1
+                shared_deps.append({
+                    'name': entry['name'],
+                    'language': entry['language'],
+                    'projects': projects_affected,
+                    'vulns_total': entry['vulns_total'],
+                    'vulns_prod': entry['vulns_prod'],
+                    'severity_max': entry['severity_max'],
+                })
+            if entry['vulns_total'] > 0:
+                vulnerable_agg.append({
+                    'name': entry['name'],
+                    'language': entry['language'],
+                    'projects_affected': projects_affected,
+                    'vulns_total': entry['vulns_total'],
+                    'vulns_prod': entry['vulns_prod'],
+                    'severity_max': entry['severity_max'],
+                })
+        shared_deps.sort(key=lambda x: (x['projects'], x['vulns_prod'], x['vulns_total']), reverse=True)
+        vulnerable_agg.sort(key=lambda x: (x['vulns_prod'], x['projects_affected']), reverse=True)
+        shared_ratio = round(shared_unique_count / max(total_unique, 1), 3)
+        context['dependency_aggregates'] = {
+            'shared_dependencies': shared_deps[:20],
+            'vulnerable_packages_agg': vulnerable_agg[:20],
+            'total_unique': total_unique,
+            'shared_unique': shared_unique_count,
+        }
+        context['deps_profile'] = {
+            'shared_ratio': shared_ratio
+        }
+        context['tooling'] = {
+            'php_composer': php_composer_present
+        }
+
         return context
     
     def _generate_fallback_summary(self, context: Dict) -> str:

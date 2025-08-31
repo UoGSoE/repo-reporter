@@ -29,4 +29,14 @@ Formatting requirements (important):
 - Use clear section headings: "## Overview", "## Portfolio Themes", "## Recommendations".
 - Keep paragraphs short; use bullet points for recommendations.
 - Use bold for key metrics and emphasis where helpful.
- - When referencing portfolio dependency footprint, use the unique dependency count (fields: `unique_dependency_count` or `unique_dependencies`) rather than total usage (`total_dependency_usages`), unless explicitly contrasting the two.
+- When referencing portfolio dependency footprint, use the unique dependency count (fields: `unique_dependency_count` or `unique_dependencies`) rather than total usage (`total_dependency_usages`), unless explicitly contrasting the two.
+
+Additional context and constraints (follow strictly):
+- Prefer small, concrete technical actions over staffing/process changes.
+- If the portfolio includes PHP/Laravel (see `tooling.php_composer`), treat dependency remediation as routine: prefer phrasing like "Run composer update" with a brief note to run tests and merge.
+- Only suggest staffing/process changes if explicitly warranted by provided context; otherwise avoid them.
+- Use dependency aggregates to prioritize: `dependency_aggregates.shared_dependencies` (packages used across multiple projects) and `dependency_aggregates.vulnerable_packages_agg` (vulnerability roll-ups by package).
+- If most dependencies are shared (see `deps_profile.shared_ratio`), propose a simple portfolio-wide update for top shared packages first.
+
+Recommendation structure (concise):
+- Each bullet should include: Action (1 sentence), Impact (what metric improves), Effort (S ≤ 15 min; M ≤ 2h; L > 2h), Scope (portfolio/project), and Evidence (cite fields, e.g., package appears in 3/3 projects, 12 vulns).
