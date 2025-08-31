@@ -245,6 +245,11 @@ class ReportGenerator:
                 'scc_estimated_people': scc_stats.get('estimated_people', 0.0),
                 'scc_enabled': scc_stats.get('success', False)
             }
+
+            # Split vulnerabilities into production vs dev-only for clearer rendering
+            vulns_all = project_data['vulnerabilities'] or []
+            project_data['vulnerabilities_prod'] = [v for v in vulns_all if not v.get('dev_dependency')]
+            project_data['vulnerabilities_dev'] = [v for v in vulns_all if v.get('dev_dependency')]
             
             processed['projects'][repo_url] = project_data
             
@@ -642,8 +647,8 @@ class ReportGenerator:
         template_data = {
             'project': project_data,
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'has_vulnerabilities': len(project_data.get('vulnerabilities', [])) > 0,
-            'vulnerability_count': len(project_data.get('vulnerabilities', [])),
+            'has_vulnerabilities': len(project_data.get('vulnerabilities_prod', [])) > 0,
+            'vulnerability_count': len(project_data.get('vulnerabilities_prod', [])),
             'dependency_count': project_data.get('vulnerability_summary', {}).get('total_dependencies', 0),
             'dependency_license_chart': project_dep_license_chart
         }
@@ -727,8 +732,8 @@ class ReportGenerator:
                 enhanced_project = dict(project_data)
                 enhanced_project.update({
                     'dependency_license_chart': project_dep_license_chart,
-                    'has_vulnerabilities': len(project_data.get('vulnerabilities', [])) > 0,
-                    'vulnerability_count': len(project_data.get('vulnerabilities', [])),
+                    'has_vulnerabilities': len(project_data.get('vulnerabilities_prod', [])) > 0,
+                    'vulnerability_count': len(project_data.get('vulnerabilities_prod', [])),
                     'dependency_count': project_data.get('vulnerability_summary', {}).get('total_dependencies', 0)
                 })
                 enhanced_projects[repo_url] = enhanced_project
