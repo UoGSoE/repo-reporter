@@ -388,15 +388,19 @@ class ReportGenerator:
         for project in processed_data['projects'].values():
             for lang in project.get('scc_language_summary', []) or []:
                 # Use Code lines as a better proxy for real code volume
-                name = lang.get('Name')
+                original_name = lang.get('Name')
                 code_lines = int(lang.get('Code', 0) or 0)
-                # Apply language filter from config
-                if name and self.config.is_language_reportable(name):
+                # Apply language filter and canonicalization from config
+                if original_name and self.config.is_language_reportable(original_name):
+                    name = self.config.canonical_language(original_name) or original_name
                     scc_lang_totals[name] = scc_lang_totals.get(name, 0) + code_lines
 
         if scc_lang_totals:
+            # Apply min-lines threshold from config
+            filtered_totals = {k: v for k, v in scc_lang_totals.items() if v >= self.config.min_language_lines}
+            totals_to_use = filtered_totals or scc_lang_totals  # fallback if everything filtered out
             # Sort and take top languages for readability
-            sorted_items = sorted(scc_lang_totals.items(), key=lambda x: x[1], reverse=True)
+            sorted_items = sorted(totals_to_use.items(), key=lambda x: x[1], reverse=True)
             names = [k for k, _ in sorted_items[:15]]
             values = [int(v) for _, v in sorted_items[:15]]
 
