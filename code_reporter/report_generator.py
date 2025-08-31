@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader, Template
 import pandas as pd
 import markdown
 from .llm_analyzer import LLMAnalyzer
+from .config import load_config
 from .logger import get_logger
 
 
@@ -92,6 +93,9 @@ class ReportGenerator:
         
         # Create templates if they don't exist
         self._ensure_templates()
+
+        # Load runtime config
+        self.config = load_config()
     
     def generate_reports(self, analysis_results: Dict, format_type: str = 'html') -> Dict:
         """
@@ -386,7 +390,8 @@ class ReportGenerator:
                 # Use Code lines as a better proxy for real code volume
                 name = lang.get('Name')
                 code_lines = int(lang.get('Code', 0) or 0)
-                if name:
+                # Apply language filter from config
+                if name and self.config.is_language_reportable(name):
                     scc_lang_totals[name] = scc_lang_totals.get(name, 0) + code_lines
 
         if scc_lang_totals:
