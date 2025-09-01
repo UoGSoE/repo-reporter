@@ -9,7 +9,7 @@
                     <span class="bg-white/20 px-3 py-1 rounded-full"><strong>Language:</strong> {{ project.primary_language | title if project.primary_language else 'Unknown' }}</span>
                     {% set readme = project.readme_info or {} %}
                     {% set readme_ok = (readme.found and (readme.is_meaningful if readme.is_meaningful is defined else true)) %}
-                    <span class="px-3 py-1 rounded-full {% if readme_ok %}bg-primary-500 text-white{% else %}bg-warning-500 text-white{% endif %}"
+                    <span class="px-3 py-1 rounded-full {% if readme_ok %}bg-white/20{% else %}bg-warning-600 text-white{% endif %}"
                           title="{% if not readme_ok %}{% if readme.found and (readme.is_default or readme.default_reason) %}Default README{% if readme.default_reason %} ({{ readme.default_reason }}){% endif %}{% else %}Missing README{% endif %}{% else %}README present{% endif %}">
                         <strong>Readme:</strong> {% if readme_ok %}Yes{% else %}No{% endif %}
                     </span>
