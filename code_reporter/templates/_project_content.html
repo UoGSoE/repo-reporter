@@ -248,7 +248,7 @@
                 <div class="space-y-4">
                     {% for vuln in project.vulnerabilities_prod[:10] %}
                         {% set sev = (vuln.vulnerability.severity or 'unknown') | lower %}
-                        <div class="bg-gradient-to-r from-white to-slate-50 border-l-4 {% if 'critical' in sev %}border-danger-600{% elif 'high' in sev %}border-danger-500{% elif 'medium' in sev %}border-warning-500{% elif 'low' in sev %}border-yellow-400{% else %}border-slate-300{% endif %} p-6 rounded-r-xl shadow-sm">
+                        <div class="bg-gradient-to-r from-white to-slate-50 border-l-4 {% if 'critical' in sev %}border-danger-600{% elif 'high' in sev %}border-danger-500{% elif 'medium' in sev %}border-slate-300{% elif 'low' in sev %}border-slate-300{% else %}border-slate-300{% endif %} p-6 rounded-r-xl shadow-sm">
                             <div class="flex justify-between items-start mb-3">
                                 <div>
                                     <h5 class="text-lg font-semibold text-slate-800">{{ vuln.package }}</h5>
@@ -256,8 +256,8 @@
                                 <span class="px-3 py-1 rounded-full text-xs font-bold uppercase
                                     {% if 'critical' in sev %}bg-danger-200 text-danger-800
                                     {% elif 'high' in sev %}bg-danger-100 text-danger-700
-                                    {% elif 'medium' in sev %}bg-warning-100 text-warning-700
-                                    {% elif 'low' in sev %}bg-yellow-100 text-yellow-700
+                                    {% elif 'medium' in sev %}bg-slate-100 text-slate-700
+                                    {% elif 'low' in sev %}bg-slate-100 text-slate-700
                                     {% else %}bg-slate-100 text-slate-700{% endif %}"
                                     title="{% if vuln.vulnerability.cvss_score %}CVSS {{ '%.1f'|format(vuln.vulnerability.cvss_score) }}{% if vuln.vulnerability.cvss_type %} ({{ vuln.vulnerability.cvss_type }}){% endif %}{% else %}No CVSS score available{% endif %}">
                                     {{ vuln.vulnerability.severity }}
@@ -305,7 +305,7 @@
                         <div class="p-6 space-y-4">
                             {% for vuln in project.vulnerabilities_dev[:20] %}
                                 {% set sev = (vuln.vulnerability.severity or 'unknown') | lower %}
-                                <div class="bg-white border-l-4 {% if 'critical' in sev %}border-danger-600{% elif 'high' in sev %}border-warning-500{% elif 'medium' in sev %}border-yellow-400{% elif 'low' in sev %}border-slate-300{% else %}border-slate-200{% endif %} p-6 rounded-r-xl shadow-sm">
+                                <div class="bg-white border-l-4 {% if 'critical' in sev %}border-danger-600{% elif 'high' in sev %}border-danger-500{% elif 'medium' in sev %}border-slate-300{% elif 'low' in sev %}border-slate-300{% else %}border-slate-200{% endif %} p-6 rounded-r-xl shadow-sm">
                                     <div class="flex justify-between items-start mb-3">
                                         <div>
                                             <h5 class="text-lg font-semibold text-slate-800">{{ vuln.package }} <span class="text-xs text-slate-500">(dev)</span></h5>
@@ -314,8 +314,8 @@
                                         <span class="px-3 py-1 rounded-full text-xs font-bold uppercase
                                             {% if 'critical' in sev %}bg-danger-200 text-danger-800
                                             {% elif 'high' in sev %}bg-danger-100 text-danger-700
-                                            {% elif 'medium' in sev %}bg-warning-100 text-warning-700
-                                            {% elif 'low' in sev %}bg-yellow-100 text-yellow-700
+                                            {% elif 'medium' in sev %}bg-slate-100 text-slate-700
+                                            {% elif 'low' in sev %}bg-slate-100 text-slate-700
                                             {% else %}bg-slate-100 text-slate-700{% endif %}"
                                             title="{% if vuln.vulnerability.cvss_score %}CVSS {{ '%.1f'|format(vuln.vulnerability.cvss_score) }}{% if vuln.vulnerability.cvss_type %} ({{ vuln.vulnerability.cvss_type }}){% endif %}{% else %}No CVSS score available{% endif %}">
                                             {{ vuln.vulnerability.severity }}
