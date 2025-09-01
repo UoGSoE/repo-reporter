@@ -9,6 +9,7 @@ import requests
 import time
 import tomli
 import yaml
+import os
 
 from .logger import get_logger
 
@@ -21,6 +22,9 @@ class DependencyAnalyzer:
         self.session = requests.Session()
         # Cache for CVE lookups to avoid repeated API calls
         self._cve_cache = {}
+        # GitHub token for GHSA fallback (optional)
+        self.github_token = os.getenv('GITHUB_TOKEN')
+        self._ghsa_cache: Dict[str, Dict] = {}
     
     def analyze_repository(self, repo_path: Path, language_info: Dict) -> Dict:
         """
@@ -457,13 +461,53 @@ class DependencyAnalyzer:
                                 continue
                             key = index_to_pkg[idx]
                             vulns = res.get('vulns', []) or []
+                            # Debug raw OSV result for this package/version
+                            try:
+                                logger.debug(f"OSV batch result for {key}: {len(vulns)} vulns")
+                                for vv in vulns[:5]:  # limit debug noise
+                                    dbs = vv.get('database_specific', {}) or {}
+                                    logger.debug(
+                                        f"  - id={vv.get('id')} severity_list={vv.get('severity')} db.severity={dbs.get('severity')}"
+                                    )
+                            except Exception:
+                                pass
                             # Normalize vuln records similar to single query
                             norm = []
                             for v in vulns:
                                 label = self._extract_severity_label(v)
                                 score, score_type = self._extract_cvss_score(v)
+                                if not label:
+                                    # Try affected[].ecosystem_specific.severity
+                                    label = self._extract_ecosystem_severity(v)
                                 if not label and score is not None:
                                     label = self._derive_severity_from_score(score)
+                                if not label and not score:
+                                    # Try fetching full OSV advisory by ID
+                                    vid = v.get('id')
+                                    if vid:
+                                        full = self._fetch_osv_by_id(vid)
+                                        if full:
+                                            label = self._extract_severity_label(full) or self._extract_ecosystem_severity(full)
+                                            if not score:
+                                                score, score_type = self._extract_cvss_score(full)
+                                if not label:
+                                    # GHSA fallback via GitHub API (if token available)
+                                    vid = v.get('id') or ''
+                                    if vid.startswith('GHSA-'):
+                                        adv = self._fetch_github_advisory(vid)
+                                        if adv:
+                                            gh_label = (adv.get('severity') or '').title() if adv.get('severity') else None
+                                            if not score and (adv.get('cvss') or {}).get('score'):
+                                                try:
+                                                    score = float((adv.get('cvss') or {}).get('score'))
+                                                    score_type = 'CVSS_V3'
+                                                except (TypeError, ValueError):
+                                                    pass
+                                            label = gh_label or label
+                                try:
+                                    logger.debug(f"Normalized OSV vuln id={v.get('id')} label={label} cvss={score} type={score_type}")
+                                except Exception:
+                                    pass
                                 norm.append({
                                     'id': v.get('id'),
                                     'summary': v.get('summary', 'No summary available'),
@@ -540,13 +584,51 @@ class DependencyAnalyzer:
             if response.status_code == 200:
                 data = response.json()
                 vulns = data.get('vulns', [])
+                try:
+                    logger = get_logger()
+                    logger.debug(f"OSV single result for {package['language']}:{package['name']}:{package['version']}: {len(vulns)} vulns")
+                    for vv in vulns[:5]:
+                        dbs = vv.get('database_specific', {}) or {}
+                        logger.debug(
+                            f"  - id={vv.get('id')} severity_list={vv.get('severity')} db.severity={dbs.get('severity')}"
+                        )
+                except Exception:
+                    pass
                 
                 results = []
                 for vuln in vulns:
                     label = self._extract_severity_label(vuln)
                     score, score_type = self._extract_cvss_score(vuln)
+                    if not label:
+                        label = self._extract_ecosystem_severity(vuln)
                     if not label and score is not None:
                         label = self._derive_severity_from_score(score)
+                    if not label and not score:
+                        vid = vuln.get('id')
+                        if vid:
+                            full = self._fetch_osv_by_id(vid)
+                            if full:
+                                label = self._extract_severity_label(full) or self._extract_ecosystem_severity(full)
+                                if not score:
+                                    score, score_type = self._extract_cvss_score(full)
+                    if not label:
+                        vid = vuln.get('id') or ''
+                        if vid.startswith('GHSA-'):
+                            adv = self._fetch_github_advisory(vid)
+                            if adv:
+                                gh_label = (adv.get('severity') or '').title() if adv.get('severity') else None
+                                if not score and (adv.get('cvss') or {}).get('score'):
+                                    try:
+                                        score = float((adv.get('cvss') or {}).get('score'))
+                                        score_type = 'CVSS_V3'
+                                    except (TypeError, ValueError):
+                                        pass
+                                label = gh_label or label
+                    try:
+                        logger = get_logger()
+                        logger.debug(f"Normalized OSV vuln id={vuln.get('id')} label={label} cvss={score} type={score_type}")
+                    except Exception:
+                        pass
                     results.append({
                         'id': vuln.get('id'),
                         'summary': vuln.get('summary', 'No summary available'),
@@ -588,31 +670,42 @@ class DependencyAnalyzer:
         for entry in sev_list:
             if entry.get('type') == 'CVSS_V3':
                 raw = entry.get('score')
-                try:
-                    return float(raw), 'CVSS_V3'
-                except (TypeError, ValueError):
-                    # Try to parse float from vector-like string
-                    import re as _re
-                    m = _re.search(r"(\d+\.\d+|\d+)", str(raw))
-                    if m:
-                        try:
-                            return float(m.group(1)), 'CVSS_V3'
-                        except ValueError:
-                            pass
+                # Some OSV entries provide a vector string rather than numeric score
+                if isinstance(raw, (int, float)) or (isinstance(raw, str) and raw.replace('.', '', 1).isdigit()):
+                    try:
+                        return float(raw), 'CVSS_V3'
+                    except (TypeError, ValueError):
+                        pass
+                # If it's a vector like "CVSS:3.1/...", skip numeric conversion here
+                return None, 'CVSS_V3'
         # Fallback to v2
         for entry in sev_list:
             if entry.get('type') == 'CVSS_V2':
                 raw = entry.get('score')
+                if isinstance(raw, (int, float)) or (isinstance(raw, str) and raw.replace('.', '', 1).isdigit()):
+                    try:
+                        return float(raw), 'CVSS_V2'
+                    except (TypeError, ValueError):
+                        pass
+                return None, 'CVSS_V2'
+        
+        # Other common locations (some OSV entries embed CVSS differently)
+        # Top-level cvss object
+        cvss = vuln.get('cvss') or {}
+        for key in ('score', 'baseScore'):
+            if key in cvss:
                 try:
-                    return float(raw), 'CVSS_V2'
+                    return float(cvss[key]), 'CVSS_V3'
                 except (TypeError, ValueError):
-                    import re as _re
-                    m = _re.search(r"(\d+\.\d+|\d+)", str(raw))
-                    if m:
-                        try:
-                            return float(m.group(1)), 'CVSS_V2'
-                        except ValueError:
-                            pass
+                    pass
+        # database_specific cvss object
+        dbs = (vuln.get('database_specific') or {}).get('cvss') or {}
+        for key in ('score', 'baseScore'):
+            if key in dbs:
+                try:
+                    return float(dbs[key]), 'CVSS_V3'
+                except (TypeError, ValueError):
+                    pass
         return None, None
 
     def _derive_severity_from_score(self, score: float) -> str:
@@ -630,6 +723,66 @@ class DependencyAnalyzer:
         if s > 0:
             return 'Low'
         return 'Unknown'
+
+    def _extract_ecosystem_severity(self, vuln: Dict) -> Optional[str]:
+        """Check affected[].ecosystem_specific.severity values and return highest."""
+        order = {'CRITICAL': 4, 'HIGH': 3, 'MODERATE': 2, 'MEDIUM': 2, 'LOW': 1}
+        best = None
+        best_rank = 0
+        for aff in vuln.get('affected', []) or []:
+            sev = ((aff.get('ecosystem_specific') or {}).get('severity') or '').strip().upper()
+            if not sev:
+                continue
+            rank = order.get(sev, 0)
+            if rank > best_rank:
+                best = sev
+                best_rank = rank
+        if best:
+            if best == 'MODERATE':
+                return 'Medium'
+            return best.title()
+        return None
+
+    def _fetch_github_advisory(self, ghsa_id: str) -> Optional[Dict]:
+        """Fetch advisory from GitHub by GHSA ID via GraphQL to get severity/CVSS."""
+        if not self.github_token:
+            return None
+        if ghsa_id in self._ghsa_cache:
+            return self._ghsa_cache[ghsa_id]
+        url = 'https://api.github.com/graphql'
+        query = {
+            'query': 'query($id: String!) { securityAdvisory(ghsaId: $id) { severity cvss { score vectorString } } }',
+            'variables': {'id': ghsa_id}
+        }
+        headers = {'Authorization': f'bearer {self.github_token}'}
+        try:
+            resp = self.session.post(url, json=query, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                adv = ((data or {}).get('data') or {}).get('securityAdvisory')
+                if adv:
+                    self._ghsa_cache[ghsa_id] = adv
+                    logger = get_logger()
+                    logger.debug(f"GitHub advisory fetched for {ghsa_id}: severity={adv.get('severity')} cvss={((adv.get('cvss') or {}).get('score'))}")
+                    return adv
+        except Exception:
+            pass
+        return None
+
+    def _fetch_osv_by_id(self, vuln_id: str) -> Optional[Dict]:
+        """Fetch full OSV advisory by ID for richer fields (severity, CVSS)."""
+        try:
+            url = f"{self.osv_api_base}/vulns/{vuln_id}"
+            resp = self.session.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                logger = get_logger()
+                dbs = (data.get('database_specific') or {})
+                logger.debug(f"OSV by-id fetched for {vuln_id}: db.severity={dbs.get('severity')} severity_list={data.get('severity')}")
+                return data
+        except Exception:
+            pass
+        return None
     
     def _collect_dependency_licenses(self, packages: List[Dict], repo_path: Path, language_info: Dict) -> Dict:
         """Collect license information for all dependencies."""
