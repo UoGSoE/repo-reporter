@@ -7,6 +7,12 @@
                 <div class="flex flex-wrap items-center gap-4 text-sm">
                     <span class="bg-white/20 px-3 py-1 rounded-full"><strong>Owner:</strong> {{ project.owner }}</span>
                     <span class="bg-white/20 px-3 py-1 rounded-full"><strong>Language:</strong> {{ project.primary_language | title if project.primary_language else 'Unknown' }}</span>
+                    {% set readme = project.readme_info or {} %}
+                    {% set readme_ok = (readme.found and (readme.is_meaningful if readme.is_meaningful is defined else true)) %}
+                    <span class="px-3 py-1 rounded-full {% if readme_ok %}bg-white/20{% else %}bg-warning-600 text-white{% endif %}"
+                          title="{% if not readme_ok %}{% if readme.found and (readme.is_default or readme.default_reason) %}Default README{% if readme.default_reason %} ({{ readme.default_reason }}){% endif %}{% else %}Missing README{% endif %}{% else %}README present{% endif %}">
+                        <strong>Readme:</strong> {% if readme_ok %}Yes{% else %}No{% endif %}
+                    </span>
                 </div>
             </div>
             <a href="{{ project.url }}" target="_blank" class="inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
@@ -241,15 +247,19 @@
                 
                 <div class="space-y-4">
                     {% for vuln in project.vulnerabilities_prod[:10] %}
-                        <div class="bg-gradient-to-r from-white to-slate-50 border-l-4 {% if 'high' in vuln.vulnerability.severity.lower() %}border-danger-500{% elif 'medium' in vuln.vulnerability.severity.lower() %}border-warning-500{% else %}border-yellow-400{% endif %} p-6 rounded-r-xl shadow-sm">
+                        {% set sev = (vuln.vulnerability.severity or 'unknown') | lower %}
+                        <div class="bg-gradient-to-r from-white to-slate-50 border-l-4 {% if 'critical' in sev %}border-danger-600{% elif 'high' in sev %}border-danger-500{% elif 'medium' in sev %}border-slate-300{% elif 'low' in sev %}border-slate-300{% else %}border-slate-300{% endif %} p-6 rounded-r-xl shadow-sm">
                             <div class="flex justify-between items-start mb-3">
                                 <div>
                                     <h5 class="text-lg font-semibold text-slate-800">{{ vuln.package }}</h5>
                                 </div>
                                 <span class="px-3 py-1 rounded-full text-xs font-bold uppercase
-                                    {% if 'high' in vuln.vulnerability.severity.lower() %}bg-danger-100 text-danger-700
-                                    {% elif 'medium' in vuln.vulnerability.severity.lower() %}bg-warning-100 text-warning-700
-                                    {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                    {% if 'critical' in sev %}bg-danger-50 text-danger-700
+                                    {% elif 'high' in sev %}bg-danger-50 text-danger-700
+                                    {% elif 'medium' in sev %}bg-slate-100 text-slate-700
+                                    {% elif 'low' in sev %}bg-slate-100 text-slate-700
+                                    {% else %}bg-slate-100 text-slate-700{% endif %}"
+                                    title="{% if vuln.vulnerability.cvss_score %}CVSS {{ '%.1f'|format(vuln.vulnerability.cvss_score) }}{% if vuln.vulnerability.cvss_type %} ({{ vuln.vulnerability.cvss_type }}){% endif %}{% else %}No CVSS score available{% endif %}">
                                     {{ vuln.vulnerability.severity }}
                                 </span>
                             </div>
@@ -294,13 +304,20 @@
                         </summary>
                         <div class="p-6 space-y-4">
                             {% for vuln in project.vulnerabilities_dev[:20] %}
-                                <div class="bg-white border-l-4 {% if 'high' in vuln.vulnerability.severity.lower() %}border-warning-500{% elif 'medium' in vuln.vulnerability.severity.lower() %}border-yellow-400{% else %}border-slate-300{% endif %} p-6 rounded-r-xl shadow-sm">
+                                {% set sev = (vuln.vulnerability.severity or 'unknown') | lower %}
+                                <div class="bg-white border-l-4 {% if 'critical' in sev %}border-danger-600{% elif 'high' in sev %}border-danger-500{% elif 'medium' in sev %}border-slate-300{% elif 'low' in sev %}border-slate-300{% else %}border-slate-200{% endif %} p-6 rounded-r-xl shadow-sm">
                                     <div class="flex justify-between items-start mb-3">
                                         <div>
                                             <h5 class="text-lg font-semibold text-slate-800">{{ vuln.package }} <span class="text-xs text-slate-500">(dev)</span></h5>
                                             <p class="text-sm text-slate-600">Version {{ vuln.version }}</p>
                                         </div>
-                                        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase bg-slate-100 text-slate-700">
+                                        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase
+                                            {% if 'critical' in sev %}bg-danger-50 text-danger-700
+                                            {% elif 'high' in sev %}bg-danger-50 text-danger-700
+                                            {% elif 'medium' in sev %}bg-slate-100 text-slate-700
+                                            {% elif 'low' in sev %}bg-slate-100 text-slate-700
+                                            {% else %}bg-slate-100 text-slate-700{% endif %}"
+                                            title="{% if vuln.vulnerability.cvss_score %}CVSS {{ '%.1f'|format(vuln.vulnerability.cvss_score) }}{% if vuln.vulnerability.cvss_type %} ({{ vuln.vulnerability.cvss_type }}){% endif %}{% else %}No CVSS score available{% endif %}">
                                             {{ vuln.vulnerability.severity }}
                                         </span>
                                     </div>
