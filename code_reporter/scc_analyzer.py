@@ -60,7 +60,7 @@ class SCCAnalyzer:
         
         try:
             # Run SCC with JSON2 output format
-            cmd = ['scc', '--format', 'json2', str(repo_path)]
+            cmd = ['scc', '--format', 'json2', '-x', 'css,svg', str(repo_path)]
             
             self.logger.debug(f"Running SCC analysis: {' '.join(cmd)}")
             

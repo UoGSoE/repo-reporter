@@ -254,8 +254,8 @@
                                     <h5 class="text-lg font-semibold text-slate-800">{{ vuln.package }}</h5>
                                 </div>
                                 <span class="px-3 py-1 rounded-full text-xs font-bold uppercase
-                                    {% if 'critical' in sev %}bg-danger-200 text-danger-800
-                                    {% elif 'high' in sev %}bg-danger-100 text-danger-700
+                                    {% if 'critical' in sev %}bg-danger-50 text-danger-700
+                                    {% elif 'high' in sev %}bg-danger-50 text-danger-700
                                     {% elif 'medium' in sev %}bg-slate-100 text-slate-700
                                     {% elif 'low' in sev %}bg-slate-100 text-slate-700
                                     {% else %}bg-slate-100 text-slate-700{% endif %}"
@@ -312,8 +312,8 @@
                                             <p class="text-sm text-slate-600">Version {{ vuln.version }}</p>
                                         </div>
                                         <span class="px-3 py-1 rounded-full text-xs font-bold uppercase
-                                            {% if 'critical' in sev %}bg-danger-200 text-danger-800
-                                            {% elif 'high' in sev %}bg-danger-100 text-danger-700
+                                            {% if 'critical' in sev %}bg-danger-50 text-danger-700
+                                            {% elif 'high' in sev %}bg-danger-50 text-danger-700
                                             {% elif 'medium' in sev %}bg-slate-100 text-slate-700
                                             {% elif 'low' in sev %}bg-slate-100 text-slate-700
                                             {% else %}bg-slate-100 text-slate-700{% endif %}"
