@@ -458,16 +458,21 @@ class DependencyAnalyzer:
                             key = index_to_pkg[idx]
                             vulns = res.get('vulns', []) or []
                             # Normalize vuln records similar to single query
-                            norm = [
-                                {
+                            norm = []
+                            for v in vulns:
+                                label = self._extract_severity_label(v)
+                                score, score_type = self._extract_cvss_score(v)
+                                if not label and score is not None:
+                                    label = self._derive_severity_from_score(score)
+                                norm.append({
                                     'id': v.get('id'),
                                     'summary': v.get('summary', 'No summary available'),
-                                    'severity': self._extract_severity(v),
+                                    'severity': label or 'Unknown',
+                                    'cvss_score': score,
+                                    'cvss_type': score_type,
                                     'published': v.get('published'),
                                     'modified': v.get('modified')
-                                }
-                                for v in vulns
-                            ]
+                                })
                             self._cve_cache[f"{key[0]}:{key[1]}:{key[2]}"] = norm
                             batch_vulns_map[key] = norm
                         break
@@ -536,16 +541,22 @@ class DependencyAnalyzer:
                 data = response.json()
                 vulns = data.get('vulns', [])
                 
-                return [
-                    {
+                results = []
+                for vuln in vulns:
+                    label = self._extract_severity_label(vuln)
+                    score, score_type = self._extract_cvss_score(vuln)
+                    if not label and score is not None:
+                        label = self._derive_severity_from_score(score)
+                    results.append({
                         'id': vuln.get('id'),
                         'summary': vuln.get('summary', 'No summary available'),
-                        'severity': self._extract_severity(vuln),
+                        'severity': label or 'Unknown',
+                        'cvss_score': score,
+                        'cvss_type': score_type,
                         'published': vuln.get('published'),
                         'modified': vuln.get('modified')
-                    }
-                    for vuln in vulns
-                ]
+                    })
+                return results
             
         except Exception:
             # Don't fail the entire analysis if CVE lookup fails
@@ -553,17 +564,71 @@ class DependencyAnalyzer:
         
         return []
     
-    def _extract_severity(self, vuln: Dict) -> Optional[str]:
-        """Extract severity from vulnerability data."""
-        severity = vuln.get('database_specific', {}).get('severity')
-        if severity:
-            return severity
-        
-        # Check for CVSS scores
-        for score in vuln.get('severity', []):
-            if score.get('type') == 'CVSS_V3':
-                return score.get('score', 'Unknown')
-        
+    def _extract_severity_label(self, vuln: Dict) -> Optional[str]:
+        """Extract textual severity label if present (normalize to standard levels)."""
+        label = (vuln.get('database_specific', {}) or {}).get('severity')
+        if not label:
+            return None
+        l = str(label).strip().upper()
+        # Normalize common variants
+        if l in ('CRITICAL',):
+            return 'Critical'
+        if l in ('HIGH',):
+            return 'High'
+        if l in ('MODERATE', 'MEDIUM'):
+            return 'Medium'
+        if l in ('LOW',):
+            return 'Low'
+        return l.title()
+
+    def _extract_cvss_score(self, vuln: Dict) -> tuple[Optional[float], Optional[str]]:
+        """Extract CVSS score (v3 preferred, fallback to v2). Returns (score, type)."""
+        sev_list = vuln.get('severity', []) or []
+        # Prefer v3
+        for entry in sev_list:
+            if entry.get('type') == 'CVSS_V3':
+                raw = entry.get('score')
+                try:
+                    return float(raw), 'CVSS_V3'
+                except (TypeError, ValueError):
+                    # Try to parse float from vector-like string
+                    import re as _re
+                    m = _re.search(r"(\d+\.\d+|\d+)", str(raw))
+                    if m:
+                        try:
+                            return float(m.group(1)), 'CVSS_V3'
+                        except ValueError:
+                            pass
+        # Fallback to v2
+        for entry in sev_list:
+            if entry.get('type') == 'CVSS_V2':
+                raw = entry.get('score')
+                try:
+                    return float(raw), 'CVSS_V2'
+                except (TypeError, ValueError):
+                    import re as _re
+                    m = _re.search(r"(\d+\.\d+|\d+)", str(raw))
+                    if m:
+                        try:
+                            return float(m.group(1)), 'CVSS_V2'
+                        except ValueError:
+                            pass
+        return None, None
+
+    def _derive_severity_from_score(self, score: float) -> str:
+        """Map CVSS score to severity bucket (Critical/High/Medium/Low)."""
+        try:
+            s = float(score)
+        except (TypeError, ValueError):
+            return 'Unknown'
+        if s >= 9.0:
+            return 'Critical'
+        if s >= 7.0:
+            return 'High'
+        if s >= 4.0:
+            return 'Medium'
+        if s > 0:
+            return 'Low'
         return 'Unknown'
     
     def _collect_dependency_licenses(self, packages: List[Dict], repo_path: Path, language_info: Dict) -> Dict:
