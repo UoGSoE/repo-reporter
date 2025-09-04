@@ -132,7 +132,7 @@ def load_config() -> ReportConfig:
     if env_path:
         data = _load_json(Path(env_path))
         if data:
-            return _from_dict(data)
+            return _apply_env_overrides(_from_dict(data))
 
     # 2) Search upwards for code_reporter_config.json
     current = Path(__file__).resolve().parent
@@ -140,13 +140,13 @@ def load_config() -> ReportConfig:
         candidate = current / "code_reporter_config.json"
         data = _load_json(candidate)
         if data:
-            return _from_dict(data)
+            return _apply_env_overrides(_from_dict(data))
         if current.parent == current:
             break
         current = current.parent
 
     # 3) Defaults
-    return ReportConfig()
+    return _apply_env_overrides(ReportConfig())
 
 
 def _from_dict(data: dict) -> ReportConfig:
@@ -170,3 +170,22 @@ def _from_dict(data: dict) -> ReportConfig:
         language_aliases=aliases,
         pie_small_slice_threshold=small_slice,
     )
+
+
+def _apply_env_overrides(cfg: ReportConfig) -> ReportConfig:
+    """Override config values from environment variables (.env supported).
+
+    Supported env vars:
+    - PIE_SMALL_SLICE_THRESHOLD (float 0..1), e.g., 0.10 for 10%
+    - CODE_REPORTER_PIE_SMALL_SLICE_THRESHOLD (alias)
+    """
+    try:
+        raw = os.getenv("PIE_SMALL_SLICE_THRESHOLD") or os.getenv("CODE_REPORTER_PIE_SMALL_SLICE_THRESHOLD")
+        if raw is not None:
+            val = float(raw)
+            # clamp to [0,1]
+            val = max(0.0, min(1.0, val))
+            cfg.pie_small_slice_threshold = val
+    except Exception:
+        pass
+    return cfg
