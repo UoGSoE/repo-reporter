@@ -298,6 +298,18 @@ Focus on business value, current status, and any concerns for management attenti
         if summary['activity_metrics']['total_stars'] > 5000:
             portfolio_maturity = "mature"
         
+        # Aggregate severity buckets for production vulnerabilities
+        sev_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
+        for project in projects.values():
+            if not project.get('success'):
+                continue
+            for v in (project.get('vulnerabilities') or []):
+                if v.get('dev_dependency'):
+                    continue
+                sev = ((v.get('vulnerability') or {}).get('severity') or "UNKNOWN").upper()
+                sev = sev if sev in sev_counts else "UNKNOWN"
+                sev_counts[sev] += 1
+
         context = {
             # Project narratives for synthesis
             'project_summaries': project_summaries,
@@ -315,7 +327,14 @@ Focus on business value, current status, and any concerns for management attenti
             'risk_assessment': {
                 'projects_at_risk': vulnerable_projects_count,
                 'risk_percentage': round((vulnerable_projects_count / max(total_projects, 1)) * 100, 1),
-                'total_vulnerabilities': summary['total_vulnerabilities']
+                'total_vulnerabilities': summary['total_vulnerabilities'],
+                'severity_counts': {
+                    'critical': sev_counts['CRITICAL'],
+                    'high': sev_counts['HIGH'],
+                    'medium': sev_counts['MEDIUM'],
+                    'low': sev_counts['LOW'],
+                    'unknown': sev_counts['UNKNOWN'],
+                }
             },
             
             # Activity summary

@@ -86,6 +86,8 @@ class ReportConfig:
             "PowerShell", "Powershell", "pwsh", "ps1", "psm1"
         ],
     })
+    # Group tiny pie slices under "Other" if below this fraction (e.g., 0.05 = 5%)
+    pie_small_slice_threshold: float = 0.05
 
     def is_language_reportable(self, name: Optional[str]) -> bool:
         if not name:
@@ -121,48 +123,31 @@ def load_config() -> ReportConfig:
     """Load configuration from JSON if available, otherwise defaults.
 
     Load order:
-    1) CODE_REPORTER_CONFIG env var (JSON file path)
-    2) ./code_reporter_config.json in project root (walk up from this file)
-    3) Defaults
+    1) Defaults
+    2) Environment overrides (from .env): PIE_SMALL_SLICE_THRESHOLD
     """
-    # 1) Env var path
-    env_path = os.getenv("CODE_REPORTER_CONFIG")
-    if env_path:
-        data = _load_json(Path(env_path))
-        if data:
-            return _from_dict(data)
+    return _apply_env_overrides(ReportConfig())
 
-    # 2) Search upwards for code_reporter_config.json
-    current = Path(__file__).resolve().parent
-    for _ in range(6):  # search up a few levels
-        candidate = current / "code_reporter_config.json"
-        data = _load_json(candidate)
-        if data:
-            return _from_dict(data)
-        if current.parent == current:
-            break
-        current = current.parent
 
-    # 3) Defaults
+def _from_dict(data: dict) -> ReportConfig:  # deprecated path; kept for compatibility if needed
+    # Not used now; JSON discovery removed. Kept to avoid breaking imports.
     return ReportConfig()
 
 
-def _from_dict(data: dict) -> ReportConfig:
-    mode = data.get("language_filter_mode", "blacklist").lower()
-    bl = set(data.get("languages_blacklist", [])) or set(DEFAULT_BLACKLIST)
-    wl = set(data.get("languages_whitelist", [])) or set(DEFAULT_WHITELIST)
-    min_lines = int(data.get("min_language_lines", 500))
-    aliases = data.get("language_aliases") or {
-        "Shell": [
-            "Shell", "Bash", "BASH", "Zsh", "zsh", "Ksh", "Tcsh", "csh", "sh", "fish",
-            "PowerShell", "Powershell", "pwsh", "ps1", "psm1"
-        ],
-    }
-    # Ensure we don't accidentally blacklist things templates asked to keep
-    return ReportConfig(
-        language_filter_mode=mode,
-        languages_blacklist=bl,
-        languages_whitelist=wl,
-        min_language_lines=min_lines,
-        language_aliases=aliases,
-    )
+def _apply_env_overrides(cfg: ReportConfig) -> ReportConfig:
+    """Override config values from environment variables (.env supported).
+
+    Supported env vars:
+    - PIE_SMALL_SLICE_THRESHOLD (float 0..1), e.g., 0.10 for 10%
+    - CODE_REPORTER_PIE_SMALL_SLICE_THRESHOLD (alias)
+    """
+    try:
+        raw = os.getenv("PIE_SMALL_SLICE_THRESHOLD") or os.getenv("CODE_REPORTER_PIE_SMALL_SLICE_THRESHOLD")
+        if raw is not None:
+            val = float(raw)
+            # clamp to [0,1]
+            val = max(0.0, min(1.0, val))
+            cfg.pie_small_slice_threshold = val
+    except Exception:
+        pass
+    return cfg

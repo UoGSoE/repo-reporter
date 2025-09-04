@@ -138,6 +138,7 @@ uv run main.py --help
 | `GITHUB_TOKEN` | Optional | GitHub token for private repos/higher limits |
 | `SENTRY_AUTH_TOKEN` | Optional | Sentry API token for error tracking |
 | `SENTRY_ORG_SLUG` | Optional | Sentry organization slug |
+| `PIE_SMALL_SLICE_THRESHOLD` | Optional | Fraction (0..1) to group small slices as “Others” in the Development Performance pie. Default: `0.05`. Example: `0.1`. |
 
 ### Supported LLM Models
 
