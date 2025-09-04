@@ -79,11 +79,19 @@ class DependencyAnalyzer:
         # Update headline summary to exclude dev deps and use unique package count
         result['summary']['vulnerable_packages'] = len(unique_non_dev_packages)
 
-        # Collect license information for dependencies
+        # Collect license information for dependencies (all: direct, dev, indirect)
         result['licenses'] = self._collect_dependency_licenses(all_packages, repo_path, language_info)
         
-        # Update summary
-        result['summary']['total_dependencies'] = len(all_packages)
+        # Compute headline counts: direct-only vs overall
+        direct_only_count = 0
+        for lang_deps in result['dependencies'].values():
+            if isinstance(lang_deps, dict) and lang_deps.get('detected'):
+                direct_only_count += len(lang_deps.get('packages', {}) or {})
+
+        # Use direct-only for the headline dependency count
+        result['summary']['total_dependencies'] = direct_only_count
+        # Also expose full count (including dev + indirect) for internal use if needed
+        result['summary']['total_dependencies_all'] = len(all_packages)
         
         return result
     
@@ -91,8 +99,9 @@ class DependencyAnalyzer:
         """Analyze PHP dependencies from composer.json and composer.lock."""
         result = {
             'detected': False,
-            'packages': {},
-            'dev_packages': {},
+            'packages': {},          # direct runtime deps from composer.json:require
+            'dev_packages': {},      # dev deps from composer.json:require-dev (and their locks)
+            'indirect_packages': {}, # transitive deps discovered via composer.lock
             'package_files': []
         }
         
@@ -123,22 +132,44 @@ class DependencyAnalyzer:
             try:
                 with open(composer_lock, 'r') as f:
                     lock_data = json.load(f)
-                
-                # Override with exact versions from lock file
+
+                # Override direct deps with exact versions; capture transitive separately
                 packages = lock_data.get('packages', [])
                 for package in packages:
                     name = package.get('name')
                     version = package.get('version', '').lstrip('v')
                     if name and version:
-                        result['packages'][name] = {
+                        if name in result['packages']:
+                            # Direct dependency: override with locked version
+                            result['packages'][name] = {
+                                'version': version,
+                                'constraint': result['packages'].get(name, {}).get('constraint', ''),
+                                'source': 'composer.lock'
+                            }
+                        else:
+                            # Transitive dependency: record under indirect
+                            result['indirect_packages'][name] = {
+                                'version': version,
+                                'constraint': '',
+                                'source': 'composer.lock'
+                            }
+
+                # Handle dev packages from lock (override direct dev and include additional)
+                packages_dev = lock_data.get('packages-dev', [])
+                for package in packages_dev:
+                    name = package.get('name')
+                    version = package.get('version', '').lstrip('v')
+                    if name and version:
+                        prev = result['dev_packages'].get(name, {})
+                        result['dev_packages'][name] = {
                             'version': version,
-                            'constraint': result['packages'].get(name, {}).get('constraint', ''),
+                            'constraint': prev.get('constraint', ''),
                             'source': 'composer.lock'
                         }
-                        
+
             except Exception:
                 pass  # composer.lock parsing is optional
-        
+
         return result
     
     def _parse_php_packages(self, packages: Dict) -> Dict:
@@ -309,11 +340,18 @@ class DependencyAnalyzer:
         return packages
     
     def _analyze_golang_dependencies(self, repo_path: Path) -> Dict:
-        """Analyze Golang dependencies from go.mod."""
+        """Analyze Golang dependencies from go.mod.
+
+        - Direct requires are recorded under "packages".
+        - Entries marked with "// indirect" are recorded under "indirect_packages"
+          (transitive), so headline counts can focus on direct deps while we still
+          collect licenses and vulnerabilities for the full graph.
+        """
         result = {
             'detected': False,
-            'packages': {},
-            'dev_packages': {},
+            'packages': {},            # direct runtime deps
+            'dev_packages': {},        # reserved for parity with other ecosystems
+            'indirect_packages': {},   # transitive deps ("// indirect")
             'package_files': []
         }
         
@@ -332,13 +370,18 @@ class DependencyAnalyzer:
                     for line in require_block.split('\n'):
                         line = line.strip()
                         if line and not line.startswith('//'):
-                            parts = line.split()
+                            # Distinguish transitive lines: "... vX.Y.Z // indirect"
+                            is_indirect = ' // indirect' in line
+                            clean = line.split('//')[0].strip()
+                            parts = clean.split()
                             if len(parts) >= 2:
                                 name = parts[0]
-                                version = parts[1].lstrip('v')
-                                result['packages'][name] = {
+                                version_token = parts[1]
+                                version = version_token.lstrip('v')
+                                target = result['indirect_packages' if is_indirect else 'packages']
+                                target[name] = {
                                     'version': version,
-                                    'constraint': parts[1],
+                                    'constraint': version_token,
                                     'source': 'go.mod'
                                 }
                 
@@ -346,13 +389,18 @@ class DependencyAnalyzer:
                 for line in content.split('\n'):
                     line = line.strip()
                     if line.startswith('require ') and '(' not in line:
-                        parts = line.replace('require ', '').split()
+                        body = line.replace('require ', '').strip()
+                        is_indirect = ' // indirect' in body
+                        clean = body.split('//')[0].strip()
+                        parts = clean.split()
                         if len(parts) >= 2:
                             name = parts[0]
-                            version = parts[1].lstrip('v')
-                            result['packages'][name] = {
+                            version_token = parts[1]
+                            version = version_token.lstrip('v')
+                            target = result['indirect_packages' if is_indirect else 'packages']
+                            target[name] = {
                                 'version': version,
-                                'constraint': parts[1],
+                                'constraint': version_token,
                                 'source': 'go.mod'
                             }
                             
@@ -380,7 +428,10 @@ class DependencyAnalyzer:
         return version_match.group(1) if version_match else 'unknown'
     
     def _flatten_dependencies(self, dependencies: Dict) -> List[Dict]:
-        """Flatten nested dependency structure into a list of packages."""
+        """Flatten nested dependency structure into a list of packages.
+
+        Includes direct, dev, and indirect (transitive) dependencies when present.
+        """
         packages = []
         
         for lang, lang_deps in dependencies.items():
@@ -394,7 +445,8 @@ class DependencyAnalyzer:
                     'version': info['version'],
                     'language': lang,
                     'source': info['source'],
-                    'dev': False
+                    'dev': False,
+                    'indirect': False
                 })
             
             # Add dev packages
@@ -404,9 +456,21 @@ class DependencyAnalyzer:
                     'version': info['version'],
                     'language': lang,
                     'source': info['source'],
-                    'dev': True
+                    'dev': True,
+                    'indirect': False
                 })
-        
+
+            # Add indirect (transitive) packages if present
+            for name, info in lang_deps.get('indirect_packages', {}).items():
+                packages.append({
+                    'name': name,
+                    'version': info['version'],
+                    'language': lang,
+                    'source': info['source'],
+                    'dev': False,
+                    'indirect': True
+                })
+
         return packages
     
     def _check_vulnerabilities(self, packages: List[Dict]) -> List[Dict]:

@@ -395,19 +395,20 @@ class ReportGenerator:
         
         # Dependency and security metrics
         vuln_summary = project_data.get('vulnerability_summary', {})
+        # Use direct-only dependency count for headline portfolio totals
         summary['total_dependencies'] += vuln_summary.get('total_dependencies', 0)
         # Track total production vulnerabilities (findings) across portfolio
         summary['total_vulnerabilities'] += len(project_data.get('vulnerabilities_prod', []) )
         
-        # Track unique dependencies (simple deduplication)
+        # Track unique dependencies (direct only; exclude dev and transitive)
         dependencies = project_data.get('dependencies', {})
         for language, dep_categories in dependencies.items():
             if isinstance(dep_categories, dict):
-                for category, packages in dep_categories.items():
-                    if isinstance(packages, dict):
-                        for package_name in packages.keys():
-                            dep_key = f"{language}:{package_name}"
-                            summary['unique_dependencies'].add(dep_key)
+                packages = dep_categories.get('packages', {}) or {}
+                if isinstance(packages, dict):
+                    for package_name in packages.keys():
+                        dep_key = f"{language}:{package_name}"
+                        summary['unique_dependencies'].add(dep_key)
         
         # Aggregate dependency license distribution
         dep_licenses = project_data.get('dependency_licenses', {})
