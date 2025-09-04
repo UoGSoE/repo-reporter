@@ -624,8 +624,9 @@ class ReportGenerator:
                 # Group small slices under "Other" based on config threshold
                 total = sum(i['score'] for i in nonzero) or 1
                 threshold = max(0.0, min(1.0, float(self.config.pie_small_slice_threshold)))
-                keep = [i for i in nonzero if (i['score'] / total) >= threshold]
-                other_items = [i for i in nonzero if (i['score'] / total) < threshold]
+                # Group items at or below the threshold under "Others"
+                keep = [i for i in nonzero if (i['score'] / total) > threshold]
+                other_items = [i for i in nonzero if (i['score'] / total) <= threshold]
 
                 # Keep list length reasonable (still group long tail)
                 top_n = 12
@@ -643,7 +644,7 @@ class ReportGenerator:
                     customdata.append([b['commits'], b['contributors'], b['sentry_events'], b['sentry_issues'], b['stars'], item['score']])
 
                 if other_items:
-                    labels.append('Other')
+                    labels.append('Others')
                     values.append(sum(i['score'] for i in other_items))
                     commits = sum(i['breakdown']['commits'] for i in other_items)
                     contributors = sum(i['breakdown']['contributors'] for i in other_items)
