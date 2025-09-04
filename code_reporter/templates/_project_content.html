@@ -11,7 +11,7 @@
                     {% set readme_ok = (readme.found and (readme.is_meaningful if readme.is_meaningful is defined else true)) %}
                     <span class="px-3 py-1 rounded-full {% if readme_ok %}bg-white/20{% else %}bg-warning-600 text-white{% endif %}"
                           title="{% if not readme_ok %}{% if readme.found and (readme.is_default or readme.default_reason) %}Default README{% if readme.default_reason %} ({{ readme.default_reason }}){% endif %}{% else %}Missing README{% endif %}{% else %}README present{% endif %}">
-                        <strong>Readme:</strong> {% if readme_ok %}Yes{% else %}No{% endif %}
+                        <strong>Docs:</strong> {% if readme_ok %}Yes{% else %}No{% endif %}
                     </span>
                 </div>
             </div>
