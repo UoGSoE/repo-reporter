@@ -602,56 +602,80 @@ class ReportGenerator:
                     'breakdown': breakdown
                 })
 
-            # Sort and group tail for readability in a pie
+            # Sort
             activity_data.sort(key=lambda x: x['score'], reverse=True)
-            top_n = 12
-            top_items = activity_data[:top_n]
-            other_items = activity_data[top_n:]
 
-            labels = [item['name'] for item in top_items]
-            values = [item['score'] for item in top_items]
-            if other_items:
-                labels.append('Other')
-                values.append(sum(i['score'] for i in other_items))
+            # Remove zero-score items to avoid cluttering legend
+            nonzero = [i for i in activity_data if i['score'] > 0]
 
-            # Prepare customdata for detailed hover for top items
-            customdata = []
-            for item in top_items:
-                b = item['breakdown']
-                customdata.append([b['commits'], b['contributors'], b['sentry_events'], b['sentry_issues'], b['stars'], item['score']])
-            if other_items:
-                # Aggregate minimal info for Other
-                commits = sum(i['breakdown']['commits'] for i in other_items)
-                contributors = sum(i['breakdown']['contributors'] for i in other_items)
-                sentry_events = sum(i['breakdown']['sentry_events'] for i in other_items)
-                sentry_issues = sum(i['breakdown']['sentry_issues'] for i in other_items)
-                stars = sum(i['breakdown']['stars'] for i in other_items)
-                score_sum = sum(i['score'] for i in other_items)
-                customdata.append([commits, contributors, sentry_events, sentry_issues, stars, score_sum])
+            # If everything is zero, fall back to original simple bar
+            if not nonzero:
+                vuln_projects = sum(1 for p in processed_data['projects'].values() 
+                                   if p.get('vulnerability_summary', {}).get('vulnerable_packages', 0) > 0)
+                safe_projects = summary['successful_analyses'] - vuln_projects
+                fig_security = go.Figure(data=[
+                    go.Bar(x=['Projects with Vulnerabilities', 'Secure Projects'], 
+                           y=[vuln_projects, safe_projects],
+                           marker_color=['red', 'green'])
+                ])
+                fig_security.update_layout(title="Security Overview")
+                charts['security_overview'] = fig_security.to_html(include_plotlyjs=False, div_id="security-chart")
+            else:
+                # Group small slices under "Other" based on config threshold
+                total = sum(i['score'] for i in nonzero) or 1
+                threshold = max(0.0, min(1.0, float(self.config.pie_small_slice_threshold)))
+                keep = [i for i in nonzero if (i['score'] / total) >= threshold]
+                other_items = [i for i in nonzero if (i['score'] / total) < threshold]
 
-            fig_activity = go.Figure(data=[go.Pie(
-                labels=labels,
-                values=values,
-                textinfo='label+percent',
-                customdata=customdata,
-                hovertemplate=(
-                    '<b>%{label}</b><br>'
-                    'Activity Score Share: %{percent}<br>'
-                    '<br><b>Details (aggregated)</b><br>'
-                    '• Commits: %{customdata[0]}<br>'
-                    '• Contributors: %{customdata[1]}<br>'
-                    '• Sentry Events: %{customdata[2]}<br>'
-                    '• Sentry Issues: %{customdata[3]}<br>'
-                    '• Stars: %{customdata[4]}<br>'
-                    '• Score: %{customdata[5]}'
-                    '<extra></extra>'
-                )
-            )])
+                # Keep list length reasonable (still group long tail)
+                top_n = 12
+                keep = keep[:top_n]
+                if len(nonzero) > top_n:
+                    other_items += nonzero[top_n:]
 
-            # Remove plot title to avoid overlap with card header
-            fig_activity.update_layout(title=None)
+                labels = [item['name'] for item in keep]
+                values = [item['score'] for item in keep]
 
-            charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs=False, div_id="activity-chart")
+                # Prepare customdata for detailed hover for kept items
+                customdata = []
+                for item in keep:
+                    b = item['breakdown']
+                    customdata.append([b['commits'], b['contributors'], b['sentry_events'], b['sentry_issues'], b['stars'], item['score']])
+
+                if other_items:
+                    labels.append('Other')
+                    values.append(sum(i['score'] for i in other_items))
+                    commits = sum(i['breakdown']['commits'] for i in other_items)
+                    contributors = sum(i['breakdown']['contributors'] for i in other_items)
+                    sentry_events = sum(i['breakdown']['sentry_events'] for i in other_items)
+                    sentry_issues = sum(i['breakdown']['sentry_issues'] for i in other_items)
+                    stars = sum(i['breakdown']['stars'] for i in other_items)
+                    score_sum = sum(i['score'] for i in other_items)
+                    customdata.append([commits, contributors, sentry_events, sentry_issues, stars, score_sum])
+
+                fig_activity = go.Figure(data=[go.Pie(
+                    labels=labels,
+                    values=values,
+                    textinfo='label+percent',
+                    customdata=customdata,
+                    hovertemplate=(
+                        '<b>%{label}</b><br>'
+                        'Activity Score Share: %{percent}<br>'
+                        '<br><b>Details (aggregated)</b><br>'
+                        '• Commits: %{customdata[0]}<br>'
+                        '• Contributors: %{customdata[1]}<br>'
+                        '• Sentry Events: %{customdata[2]}<br>'
+                        '• Sentry Issues: %{customdata[3]}<br>'
+                        '• Stars: %{customdata[4]}<br>'
+                        '• Score: %{customdata[5]}'
+                        '<extra></extra>'
+                    )
+                )])
+
+                # Remove plot title to avoid overlap with card header
+                fig_activity.update_layout(title=None)
+
+                charts['activity_metrics'] = fig_activity.to_html(include_plotlyjs=False, div_id="activity-chart")
         
         return charts
     

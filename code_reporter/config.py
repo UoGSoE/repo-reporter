@@ -86,6 +86,8 @@ class ReportConfig:
             "PowerShell", "Powershell", "pwsh", "ps1", "psm1"
         ],
     })
+    # Group tiny pie slices under "Other" if below this fraction (e.g., 0.05 = 5%)
+    pie_small_slice_threshold: float = 0.05
 
     def is_language_reportable(self, name: Optional[str]) -> bool:
         if not name:
@@ -158,6 +160,7 @@ def _from_dict(data: dict) -> ReportConfig:
             "PowerShell", "Powershell", "pwsh", "ps1", "psm1"
         ],
     }
+    small_slice = float(data.get("pie_small_slice_threshold", 0.05))
     # Ensure we don't accidentally blacklist things templates asked to keep
     return ReportConfig(
         language_filter_mode=mode,
@@ -165,4 +168,5 @@ def _from_dict(data: dict) -> ReportConfig:
         languages_whitelist=wl,
         min_language_lines=min_lines,
         language_aliases=aliases,
+        pie_small_slice_threshold=small_slice,
     )

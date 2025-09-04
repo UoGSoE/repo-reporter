@@ -52,6 +52,35 @@
         </div>
         <div class="p-8">
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                {% if project.github_metadata.is_private %}
+                <!-- Replace community metrics with internal activity for private repos -->
+                <div class="group hover:scale-105 transition-transform duration-200">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl text-center border border-blue-200">
+                        <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M3 12h2m14 0h2M12 3v2m0 14v2m-7.07-9.07l1.41 1.41M17.66 6.34l1.41 1.41M6.34 17.66l1.41-1.41M16.95 12.95l1.41-1.41"/>
+                            </svg>
+                        </div>
+                        <div class="text-3xl font-bold text-blue-600 mb-1">{{ project.github_commits.past_month.total | default(0) }}</div>
+                        <div class="text-sm font-medium text-slate-600">Recent Commits (30d)</div>
+                        <div class="text-xs text-slate-500 mt-1">Development activity</div>
+                    </div>
+                </div>
+
+                <div class="group hover:scale-105 transition-transform duration-200">
+                    <div class="bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-xl text-center border border-slate-200">
+                        <div class="w-12 h-12 bg-slate-500 rounded-lg flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M16 11V7a4 4 0 10-8 0v4H5a1 1 0 00-1 1v7a1 1 0 001 1h14a1 1 0 001-1v-7a1 1 0 00-1-1h-3zm-6 0V7a2 2 0 114 0v4h-4z"/>
+                            </svg>
+                        </div>
+                        <div class="text-3xl font-bold text-slate-600 mb-1">{{ project.github_commits.past_month.unique_authors | default(0) }}</div>
+                        <div class="text-sm font-medium text-slate-600">Active Contributors (30d)</div>
+                        <div class="text-xs text-slate-500 mt-1">Team engagement</div>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Public repos: show community metrics -->
                 <div class="group hover:scale-105 transition-transform duration-200">
                     <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl text-center border border-blue-200">
                         <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3">
@@ -64,7 +93,7 @@
                         <div class="text-xs text-slate-500 mt-1">Community engagement</div>
                     </div>
                 </div>
-                
+
                 <div class="group hover:scale-105 transition-transform duration-200">
                     <div class="bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-xl text-center border border-slate-200">
                         <div class="w-12 h-12 bg-slate-500 rounded-lg flex items-center justify-center mx-auto mb-3">
@@ -77,6 +106,7 @@
                         <div class="text-xs text-slate-500 mt-1">Community contributions</div>
                     </div>
                 </div>
+                {% endif %}
                 
                 <div class="group hover:scale-105 transition-transform duration-200">
                     <div class="bg-gradient-to-br from-success-50 to-success-100 p-6 rounded-xl text-center border border-success-200">

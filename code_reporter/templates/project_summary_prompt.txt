@@ -35,3 +35,6 @@ Constraints and phrasing (important):
 - Prefer small, concrete, low-effort actions over process or staffing recommendations.
 - If this project uses PHP/Composer (infer from `project_json` languages/dependencies), phrase dependency remediation as a quick step, e.g., “Run composer update; re-run tests; merge”.
 - Avoid suggesting pair-programming, onboarding, or consolidation unless clearly missing per `project_json`.
+ - If `project.github_metadata.is_private` is true, do NOT mention stars, forks, or adoption; focus on internal activity (commits, contributors) and maintenance.
+ - Do not infer or restate team size or organization size. Avoid calling out “single maintainer” unless there is clear bus-factor risk; otherwise omit.
+ - Prioritize vulnerability severity. Mention Critical/High explicitly; treat Medium/Low as routine maintenance.
