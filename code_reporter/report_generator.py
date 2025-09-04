@@ -116,7 +116,7 @@ class ReportGenerator:
         # Load runtime config
         self.config = load_config()
     
-    def generate_reports(self, analysis_results: Dict, format_type: str = 'html') -> Dict:
+    def generate_reports(self, analysis_results: Dict, format_type: str = 'html', *, machine: bool = False) -> Dict:
         """
         Generate reports from analysis results.
         
@@ -177,8 +177,70 @@ class ReportGenerator:
             f.write(combined_html)
         
         report_paths['combined_report'] = str(combined_path)
-        
+
+        # Optionally emit machine-readable JSON bundle
+        if machine:
+            machine_path = self._write_machine_json(processed_data)
+            report_paths['machine_json'] = str(machine_path)
+
         return report_paths
+
+    def _json_safe(self, obj: Any) -> Any:
+        """Recursively convert objects to JSON-serializable structures.
+
+        - Sets -> sorted lists
+        - Paths -> strings
+        - Datetime -> ISO strings
+        - Numpy scalars (if available) -> Python scalars
+        """
+        # Avoid importing numpy if not installed
+        np_generic = None
+        try:  # pragma: no cover - optional
+            import numpy as np  # type: ignore
+            np_generic = np.generic
+        except Exception:  # numpy not present
+            np_generic = None
+
+        if obj is None:
+            return None
+        if isinstance(obj, (str, int, float, bool)):
+            # Basic JSON types
+            return obj
+        if isinstance(obj, Path):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if np_generic is not None and isinstance(obj, np_generic):  # type: ignore[name-defined]
+            try:
+                return obj.item()  # type: ignore[attr-defined]
+            except Exception:
+                return str(obj)
+        if isinstance(obj, dict):
+            return {self._json_safe(k): self._json_safe(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [self._json_safe(x) for x in obj]
+        if isinstance(obj, set):
+            return sorted([self._json_safe(x) for x in obj])
+        # Fallback to string representation
+        return str(obj)
+
+    def _write_machine_json(self, processed_data: Dict) -> Path:
+        """Write a machine-readable JSON file to the output directory.
+
+        Produces a single JSON blob capturing the processed analysis data
+        used to render the HTML reports.
+        """
+        logger = get_logger()
+        # Convert to a JSON-serializable structure
+        safe_data = self._json_safe(processed_data)
+
+        machine_path = self.output_dir / "report.json"
+        try:
+            with open(machine_path, 'w', encoding='utf-8') as f:
+                json.dump(safe_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.warning(f"Failed to write machine JSON: {e}")
+        return machine_path
 
     def _simplify_license_name(self, license_name: str) -> str:
         """Map raw license strings to broad categories for manager-friendly charts.

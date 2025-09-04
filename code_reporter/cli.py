@@ -47,13 +47,19 @@ from .logger import init_logger, get_logger
     default='openai/gpt-5-mini',
     help='LLM model to use for executive summary generation (default: openai/gpt-5-mini)'
 )
+@click.option(
+    '--machine',
+    is_flag=True,
+    help='Also write machine-readable JSON output (report.json)'
+)
 def main(
     repo_list_file: Path,
     output_dir: Path,
     format: str,
     env_file: Optional[Path],
     verbose: bool,
-    llm: str
+    llm: str,
+    machine: bool
 ):
     """Analyze GitHub repositories and generate comprehensive reports."""
     
@@ -268,7 +274,7 @@ def main(
         logger.debug(f"Using model: {llm}")
         
         report_generator = ReportGenerator(output_dir, llm_model=llm)
-        report_paths = report_generator.generate_reports(analysis_results, format)
+        report_paths = report_generator.generate_reports(analysis_results, format, machine=machine)
         
         logger.debug("Reports generated:")
         for report_type, path in report_paths.items():
@@ -276,6 +282,8 @@ def main(
                 logger.debug(f"Executive Summary: {path}")
             elif report_type == 'combined_report':
                 logger.debug(f"Combined Report: {path}")
+            elif report_type == 'machine_json':
+                logger.debug(f"Machine JSON: {path}")
             else:
                 logger.debug(f"Project Report ({report_type.replace('https://github.com/', '')}): {path}")
         
