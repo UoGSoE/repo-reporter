@@ -111,6 +111,7 @@ Reports are generated in the `./reports` directory:
 - `executive_summary.html` - Cross-project overview for management
 - `{project}_report.html` - Detailed individual project reports
 - PDF versions (if `--format pdf` or `--format both`)
+- `report.json` - Machine-readable bundle (when using `--machine`)
 
 ## Command Line Options
 
@@ -126,6 +127,7 @@ uv run main.py --help
 | `--llm` | LLM model for summaries | `openai/gpt-5-mini` |
 | `--verbose` | Enable detailed logging | `false` |
 | `--env-file` | Custom .env file path | `.env` |
+| `--machine` | Also write machine-readable JSON (`report.json`) | `false` |
 
 ## Configuration Details
 
