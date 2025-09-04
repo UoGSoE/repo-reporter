@@ -123,53 +123,15 @@ def load_config() -> ReportConfig:
     """Load configuration from JSON if available, otherwise defaults.
 
     Load order:
-    1) CODE_REPORTER_CONFIG env var (JSON file path)
-    2) ./code_reporter_config.json in project root (walk up from this file)
-    3) Defaults
+    1) Defaults
+    2) Environment overrides (from .env): PIE_SMALL_SLICE_THRESHOLD
     """
-    # 1) Env var path
-    env_path = os.getenv("CODE_REPORTER_CONFIG")
-    if env_path:
-        data = _load_json(Path(env_path))
-        if data:
-            return _apply_env_overrides(_from_dict(data))
-
-    # 2) Search upwards for code_reporter_config.json
-    current = Path(__file__).resolve().parent
-    for _ in range(6):  # search up a few levels
-        candidate = current / "code_reporter_config.json"
-        data = _load_json(candidate)
-        if data:
-            return _apply_env_overrides(_from_dict(data))
-        if current.parent == current:
-            break
-        current = current.parent
-
-    # 3) Defaults
     return _apply_env_overrides(ReportConfig())
 
 
-def _from_dict(data: dict) -> ReportConfig:
-    mode = data.get("language_filter_mode", "blacklist").lower()
-    bl = set(data.get("languages_blacklist", [])) or set(DEFAULT_BLACKLIST)
-    wl = set(data.get("languages_whitelist", [])) or set(DEFAULT_WHITELIST)
-    min_lines = int(data.get("min_language_lines", 500))
-    aliases = data.get("language_aliases") or {
-        "Shell": [
-            "Shell", "Bash", "BASH", "Zsh", "zsh", "Ksh", "Tcsh", "csh", "sh", "fish",
-            "PowerShell", "Powershell", "pwsh", "ps1", "psm1"
-        ],
-    }
-    small_slice = float(data.get("pie_small_slice_threshold", 0.05))
-    # Ensure we don't accidentally blacklist things templates asked to keep
-    return ReportConfig(
-        language_filter_mode=mode,
-        languages_blacklist=bl,
-        languages_whitelist=wl,
-        min_language_lines=min_lines,
-        language_aliases=aliases,
-        pie_small_slice_threshold=small_slice,
-    )
+def _from_dict(data: dict) -> ReportConfig:  # deprecated path; kept for compatibility if needed
+    # Not used now; JSON discovery removed. Kept to avoid breaking imports.
+    return ReportConfig()
 
 
 def _apply_env_overrides(cfg: ReportConfig) -> ReportConfig:
