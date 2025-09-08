@@ -142,6 +142,23 @@ uv run main.py --help
 | `SENTRY_ORG_SLUG` | Optional | Sentry organization slug |
 | `PIE_SMALL_SLICE_THRESHOLD` | Optional | Fraction (0..1) to group small slices as “Others” in the Development Performance pie. Default: `0.05`. Example: `0.1`. |
 
+#### Development Performance Pie: “Others” Threshold
+
+The executive summary’s Development Performance chart shows each project’s share of a composite activity score. To keep the chart readable, small slices can be grouped into an “Others” category.
+
+- What it does: set `PIE_SMALL_SLICE_THRESHOLD` to a fraction between `0` and `1` (e.g., `0.05` = 5%). Any project whose share is at or below this fraction is grouped into “Others”.
+- Top-12 cap: regardless of the threshold, the chart keeps at most the top 12 projects visible; the rest are grouped into “Others”. This means with more than 12 active projects, you’ll almost always see “Others”.
+- How to set: in `.env` (or environment), e.g. `PIE_SMALL_SLICE_THRESHOLD=0.10`. Alias `CODE_REPORTER_PIE_SMALL_SLICE_THRESHOLD` is also supported.
+
+Heuristics by portfolio size
+- 1–5 repos: `0.00–0.03` (show all projects; “Others” usually not needed).
+- 6–10 repos: `0.05–0.10` (group genuinely small slices to declutter labels).
+- 11–12 repos: `0.07–0.12` (mild grouping; keeps the chart legible).
+- 13–25 repos: default `0.05` works well; “Others” appears due to the top‑12 cap. Use `0.03–0.07` to avoid over‑grouping among the top projects.
+- 25+ repos: `0.05–0.15` depending on how concise you want the legend; the top‑12 cap already prevents overload.
+
+Tip: If you don’t see “Others” and want it, slightly raise the threshold (e.g., from `0.05` to `0.10`). If too many projects are being grouped, lower it.
+
 ### Supported LLM Models
 
 The tool uses LiteLLM, supporting models from:
