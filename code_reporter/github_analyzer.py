@@ -1,10 +1,17 @@
-"""GitHub API integration for repository statistics."""
+"""GitHub statistics via GitHub API and local git.
+
+This module prefers using the locally cloned repository (when available)
+to compute commit activity across all branches. It falls back to the
+GitHub API for metadata, issues, and commit stats when a local clone is
+not provided or git commands fail.
+"""
 
 import json
 import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from .logger import get_logger
+from pathlib import Path
 
 
 class GitHubAnalyzer:
@@ -30,13 +37,14 @@ class GitHubAnalyzer:
         except FileNotFoundError:
             raise RuntimeError("gh CLI not found. Please install GitHub CLI.")
     
-    def analyze_repository(self, owner: str, repo: str) -> Dict:
+    def analyze_repository(self, owner: str, repo: str, local_path: Optional[Path] = None) -> Dict:
         """
         Analyze a GitHub repository for statistics.
         
         Args:
             owner: Repository owner
             repo: Repository name
+            local_path: Optional path to a local clone of the repository
             
         Returns:
             Dictionary containing repository statistics
@@ -60,8 +68,8 @@ class GitHubAnalyzer:
             # Get issue statistics (past month)
             result['issues'] = self._get_issue_statistics(owner, repo)
             
-            # Get commit statistics (past month)
-            result['commits'] = self._get_commit_statistics(owner, repo)
+            # Get commit statistics (past month). Prefer local git when available.
+            result['commits'] = self._get_commit_statistics(owner, repo, local_path)
             
             # Get contributor information
             result['contributors'] = self._get_contributor_statistics(owner, repo)
@@ -168,28 +176,80 @@ class GitHubAnalyzer:
                 'error': 'Issues not accessible'
             }
     
-    def _get_commit_statistics(self, owner: str, repo: str) -> Dict:
-        """Get commit statistics for the past month."""
-        one_month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        
-        cmd = [
+    def _get_commit_statistics(self, owner: str, repo: str, local_path: Optional[Path] = None) -> Dict:
+        """Get commit statistics for the past month.
+
+        Prefers local git (all branches) if a clone path is provided; falls
+        back to GitHub API (default branch) otherwise.
+        """
+        one_month_ago_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+        # Try local git first if available
+        if local_path is not None:
+            try:
+                # Extract commits across all branches since the cutoff
+                # Output format: "<sha>\t<author>"
+                git_cmd = [
+                    'git', '-C', str(local_path), 'log', '--all', f'--since={one_month_ago_date}',
+                    '--use-mailmap', '--pretty=format:%H\t%an'
+                ]
+                result = subprocess.run(git_cmd, capture_output=True, text=True, check=True, timeout=30)
+
+                lines = [ln for ln in result.stdout.split('\n') if ln.strip()]
+                if not lines:
+                    return {
+                        'past_month': {'total': 0, 'unique_authors': 0},
+                        'top_contributors': []
+                    }
+
+                total_commits = 0
+                authors: Dict[str, int] = {}
+                for ln in lines:
+                    # Each line: sha\tauthor
+                    parts = ln.split('\t', 1)
+                    if len(parts) != 2:
+                        continue
+                    total_commits += 1
+                    author = parts[1].strip() or 'Unknown'
+                    authors[author] = authors.get(author, 0) + 1
+
+                top_contributors = sorted(authors.items(), key=lambda x: x[1], reverse=True)[:5]
+
+                return {
+                    'past_month': {
+                        'total': total_commits,
+                        'unique_authors': len(authors)
+                    },
+                    'top_contributors': [
+                        {'name': name, 'commits': count}
+                        for name, count in top_contributors
+                    ]
+                }
+            except Exception as e:
+                # Fall through to API-based approach
+                logger = get_logger()
+                logger.debug(f"Local git commit stats failed for {owner}/{repo}: {e}; falling back to API")
+
+        # Fallback: GitHub API (default branch only)
+        since_iso = f"{one_month_ago_date}T00:00:00Z"
+        api_cmd = [
             'gh', 'api',
             f"/repos/{owner}/{repo}/commits",
             '--method', 'GET',
-            '--field', f'since={one_month_ago}T00:00:00Z',
+            '--field', f'since={since_iso}',
             '--paginate',
             '--jq', '.[] | {sha: .sha, author: .commit.author.name, date: .commit.author.date, message: .commit.message}'
         ]
-        
+
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
-            
+            result = subprocess.run(api_cmd, capture_output=True, text=True, check=True, timeout=30)
+
             if not result.stdout.strip():
                 return {
                     'past_month': {'total': 0, 'unique_authors': 0},
                     'top_contributors': []
                 }
-            
+
             # Parse commit data
             commits = []
             for line in result.stdout.strip().split('\n'):
@@ -199,27 +259,27 @@ class GitHubAnalyzer:
                         commits.append(commit_data)
                     except json.JSONDecodeError:
                         continue
-            
+
             # Count authors
-            authors = {}
+            authors: Dict[str, int] = {}
             for commit in commits:
                 author = commit.get('author', 'Unknown')
                 authors[author] = authors.get(author, 0) + 1
-            
+
             # Sort by commit count
             top_contributors = sorted(authors.items(), key=lambda x: x[1], reverse=True)[:5]
-            
+
             return {
                 'past_month': {
                     'total': len(commits),
                     'unique_authors': len(authors)
                 },
                 'top_contributors': [
-                    {'name': name, 'commits': count} 
+                    {'name': name, 'commits': count}
                     for name, count in top_contributors
                 ]
             }
-            
+
         except subprocess.CalledProcessError:
             return {
                 'past_month': {'total': 0, 'unique_authors': 0},
