@@ -146,8 +146,10 @@ def main(
                     # Analyze dependencies and vulnerabilities
                     dependency_info = dependency_analyzer.analyze_repository(repo_info.local_path, language_info)
                     
-                    # Analyze GitHub statistics
-                    github_stats = github_analyzer.analyze_repository(repo_info.owner, repo_info.name)
+                    # Analyze GitHub statistics (pass local path for full-branch commit stats)
+                    github_stats = github_analyzer.analyze_repository(
+                        repo_info.owner, repo_info.name, repo_info.local_path
+                    )
                     
                     # Analyze Sentry error data
                     logger.debug(f"Calling Sentry analyzer for {repo_info.owner}/{repo_info.name}")
