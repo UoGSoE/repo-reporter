@@ -26,17 +26,23 @@ class CodeReporterLogger:
         self.info_logger.handlers.clear()
         self.debug_logger.handlers.clear()
         
-        # Info handler - stdout with clean format
+        # Info handler - stdout; include timestamp when verbose
         info_handler = logging.StreamHandler(sys.stdout)
         info_handler.setLevel(logging.INFO)
-        info_formatter = logging.Formatter('%(message)s')
+        if self.verbose:
+            info_formatter = logging.Formatter('%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        else:
+            info_formatter = logging.Formatter('%(message)s')
         info_handler.setFormatter(info_formatter)
         self.info_logger.addHandler(info_handler)
         
         # Debug handler - stderr with timestamps when verbose
         debug_handler = logging.StreamHandler(sys.stderr)
         debug_handler.setLevel(logging.DEBUG if self.verbose else logging.WARNING)
-        debug_formatter = logging.Formatter('[%(levelname)s] %(message)s' if self.verbose else '%(message)s')
+        if self.verbose:
+            debug_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        else:
+            debug_formatter = logging.Formatter('%(message)s')
         debug_handler.setFormatter(debug_formatter)
         self.debug_logger.addHandler(debug_handler)
         

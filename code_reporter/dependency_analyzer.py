@@ -948,102 +948,99 @@ class DependencyAnalyzer:
         return name in virtual_packages.get(language, [])
     
     def _get_composer_licenses(self, repo_path: Path) -> Dict:
-        """Get license information using composer licenses command."""
-        licenses = {}
-        
-        # Check if this is a PHP project with composer and lock file
+        """Get license information for PHP packages preferring composer.lock.
+
+        Strategy (fast/safe):
+        1) Parse composer.lock for license fields (packages and packages-dev)
+           without installing dependencies.
+        2) For any packages still missing license info, attempt a lightweight
+           `composer licenses --format=json` with safe flags (no scripts/plugins).
+        3) Leave any unresolved packages to be handled by registry fallback
+           (Packagist) in _get_package_license.
+        """
+        licenses: Dict[str, Dict] = {}
+
+        # Require composer.json and lockfile to proceed
         if not (repo_path / 'composer.json').exists():
             return licenses
-        
-        if not (repo_path / 'composer.lock').exists():
+        lock_path = repo_path / 'composer.lock'
+        if not lock_path.exists():
             logger = get_logger()
             logger.debug("No composer.lock found - skipping composer licenses")
             return licenses
-        
+
+        logger = get_logger()
+        # Step 1: Parse composer.lock
         try:
-            logger = get_logger()
-            logger.debug(f"Running composer licenses in {repo_path}")
-            
-            # First try to run composer install if vendor directory doesn't exist
-            vendor_path = repo_path / 'vendor'
-            if not vendor_path.exists():
-                logger.debug("Installing composer dependencies")
-                install_result = subprocess.run(
-                    ['composer', 'install', '--no-dev', '--no-scripts', '--quiet'],
-                    cwd=repo_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=300  # 5 minutes for install
-                )
-                if install_result.returncode != 0:
-                    logger.debug("Composer install failed - falling back to API")
-                    return licenses
-            
-            # Run composer licenses command
+            lock_data = json.loads(lock_path.read_text(encoding='utf-8'))
+            for section in ('packages', 'packages-dev'):
+                for pkg in lock_data.get(section, []) or []:
+                    name = pkg.get('name')
+                    lic = pkg.get('license')
+                    if not name:
+                        continue
+                    if lic:
+                        if isinstance(lic, list):
+                            license_text = ' / '.join([str(x) for x in lic])
+                            raw = str(lic)
+                        else:
+                            license_text = str(lic)
+                            raw = str(lic)
+                        licenses[name] = {
+                            'license': license_text,
+                            'raw_license': raw,
+                            'source': 'composer_lock'
+                        }
+            if licenses:
+                logger.debug(f"composer.lock licenses parsed for {len(licenses)} packages")
+        except Exception as e:
+            logger.debug(f"Failed to parse composer.lock for licenses: {e}")
+
+        # Identify missing packages after lock parse (we only know the names later,
+        # but composer licenses output can provide broader coverage if available).
+        # We try running composer licenses just once; if it fails, we rely on Packagist.
+        try:
+            cmd = ['composer', 'licenses', '--format=json', '--no-dev', '--no-scripts', '--no-plugins']
             result = subprocess.run(
-                ['composer', 'licenses', '--format=json', '--no-dev'],
+                cmd,
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
                 timeout=60
             )
-            
-            if result.returncode == 0:
+            if result.returncode == 0 and result.stdout.strip():
                 try:
                     composer_data = json.loads(result.stdout)
-                    dependencies = composer_data.get('dependencies', [])
-                    
-                    logger.debug(f"Composer data type: {type(composer_data)}")
-                    logger.debug(f"Dependencies type: {type(dependencies)}")
-                    if isinstance(dependencies, dict):
-                        logger.debug(f"Sample dependency keys: {list(dependencies.keys())[:3]}")
-                        if dependencies:
-                            first_key = list(dependencies.keys())[0]
-                            logger.debug(f"Sample dependency structure: {first_key} -> {dependencies[first_key]}")
-                    else:
-                        logger.debug(f"First few deps: {dependencies[:2] if len(dependencies) > 0 else 'None'}")
-                    
-                    for name, dep_info in dependencies.items():
-                        if isinstance(dep_info, dict):
-                            license_list = dep_info.get('license', [])
-                        else:
-                            license_list = dep_info if isinstance(dep_info, list) else [dep_info]
-                        
-                        if name and license_list:
-                            # Join multiple licenses with " / "
-                            license_text = ' / '.join(license_list) if isinstance(license_list, list) else str(license_list)
-                            licenses[name] = {
-                                'license': license_text,
-                                'raw_license': str(license_list),
-                                'source': 'composer_command'
-                            }
-                            logger.debug(f"{name}: {license_text}")
-                        elif name:
-                            licenses[name] = {
-                                'license': 'Unknown',
-                                'raw_license': 'No license in composer output',
-                                'source': 'composer_no_license'
-                            }
-                            logger.debug(f"No license info for {name}")
-                    
-                    logger.debug(f"Composer licenses parsed: {len(licenses)} packages")
-                    
-                except json.JSONDecodeError as e:
+                    deps = composer_data.get('dependencies', {}) or {}
+                    if isinstance(deps, dict):
+                        for name, dep_info in deps.items():
+                            # Only fill gaps not present from lockfile
+                            if name in licenses:
+                                continue
+                            if isinstance(dep_info, dict):
+                                license_list = dep_info.get('license', [])
+                            else:
+                                license_list = dep_info if isinstance(dep_info, list) else [dep_info]
+                            if license_list:
+                                license_text = ' / '.join(license_list) if isinstance(license_list, list) else str(license_list)
+                                licenses[name] = {
+                                    'license': license_text,
+                                    'raw_license': str(license_list),
+                                    'source': 'composer_command'
+                                }
+                    logger.debug(f"composer licenses filled {len([k for k,v in licenses.items() if v.get('source')=='composer_command'])} missing entries")
+                except Exception as e:
                     logger.debug(f"Failed to parse composer licenses JSON: {e}")
-                    logger.debug(f"Raw output: {result.stdout[:200]}...")
-                    
             else:
-                logger.warning(f"Composer licenses command failed (exit code {result.returncode})")
                 if result.stderr:
-                    logger.debug(f"Error: {result.stderr[:200]}...")
-                    
+                    logger.debug(f"composer licenses stderr: {result.stderr[:200]}...")
         except subprocess.TimeoutExpired:
-            logger.warning("Composer licenses command timed out")
+            logger.debug("composer licenses command timed out; skipping")
         except FileNotFoundError:
-            logger.warning("Composer command not found - falling back to API")
+            logger.debug("composer not found; skipping CLI license pass")
         except Exception as e:
-            logger.warning(f"Composer licenses error: {e}")
-        
+            logger.debug(f"composer licenses error: {e}")
+
         return licenses
     
     def _clean_license_text(self, license_text: str) -> str:
